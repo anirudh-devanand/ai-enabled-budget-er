@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # Fernet key for encrypting TOTP secrets at rest (base64, 32 bytes).
     data_encryption_key: str = "3jJ8mYIphC0v9tS2mvBrLnPuqcJZTsvUV84BxSZuXAo="
 
+    # Flinks (Canadian bank aggregation). Defaults point at the public sandbox.
+    flinks_base_url: str = "https://toolbox-api.private.fin.ag"
+    flinks_customer_id: str = "43387ca6-0391-4c82-857d-70d95f087ecb"
+    flinks_auth_key: str | None = None
+    flinks_days_of_transactions: str = "Days365"
+
 
 @lru_cache
 def get_settings() -> Settings:

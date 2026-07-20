@@ -43,3 +43,37 @@ export interface MfaEnrollResponse {
 export function isMfaChallenge(r: LoginResponse): r is MfaChallengeResponse {
   return (r as MfaChallengeResponse).mfa_required === true;
 }
+
+export interface ConnectionResponse {
+  id: string;
+  household_id: string;
+  provider: string;
+  institution_name: string | null;
+  status: "pending" | "active" | "error";
+  last_synced_at: string | null;
+  created_at: string;
+}
+
+export interface AccountResponse {
+  id: string;
+  connection_id: string;
+  name: string;
+  type: string;
+  currency: string;
+  balance: string;
+  masked_number: string | null;
+}
+
+export interface TransactionResponse {
+  id: string;
+  account_id: string;
+  date: string;
+  raw_description: string;
+  amount: string;
+  currency: string;
+}
+
+export interface TransactionListResponse {
+  items: TransactionResponse[];
+  total: number;
+}

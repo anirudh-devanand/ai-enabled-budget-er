@@ -19,6 +19,7 @@ ai-enabled-budget-er/
       auth/         registration, login, tokens, MFA
       users/        user profile endpoints
       households/   household + membership endpoints
+      connections/  Flinks provider, bank connections, accounts, transactions
     alembic/        migrations
     tests/
   docs/
@@ -30,20 +31,22 @@ ai-enabled-budget-er/
 ```
 
 The backend is a modular monolith: one deployable, organized by domain so a domain can be split
-into its own service later without a rewrite. Future domains (slices 2+): `connections` (Plaid),
-`transactions`, `enrichment`, `budgets`, `goals`, `planner`, `assistant`, `notifications`.
+into its own service later without a rewrite. `connections/` (Flinks aggregation) landed in
+slice 2; future domains: `enrichment`, `budgets`, `goals`, `planner`, `assistant`,
+`notifications`.
 
 ## Entity-relationship diagram
 
-Entities in **bold** exist as of slice 1; the rest are planned and shown for direction.
+Tables through slice 2 exist with full column detail below; the remaining entities are planned
+and shown for direction.
 
 ```mermaid
 erDiagram
     USERS ||--o{ AUTH_SESSIONS : has
     USERS ||--o{ HOUSEHOLD_MEMBERS : joins
     HOUSEHOLDS ||--o{ HOUSEHOLD_MEMBERS : contains
-    HOUSEHOLDS ||--o{ PLAID_ITEMS : links
-    PLAID_ITEMS ||--o{ ACCOUNTS : provides
+    HOUSEHOLDS ||--o{ BANK_CONNECTIONS : links
+    BANK_CONNECTIONS ||--o{ ACCOUNTS : provides
     ACCOUNTS ||--o{ TRANSACTIONS : records
     TRANSACTIONS ||--|| TRANSACTION_ENRICHMENTS : "resolved by"
     TRANSACTION_ENRICHMENTS }o--|| MERCHANTS : identifies
@@ -90,11 +93,56 @@ erDiagram
         string role "owner | member"
         datetime created_at
     }
+    BANK_CONNECTIONS {
+        uuid id PK
+        uuid household_id FK
+        string provider "flinks"
+        string login_id_encrypted
+        string institution_name "nullable"
+        string status "pending | active | error"
+        datetime last_synced_at "nullable"
+        datetime created_at
+    }
+    ACCOUNTS {
+        uuid id PK
+        uuid connection_id FK
+        string external_id UK
+        string name
+        string type
+        string currency
+        decimal balance
+        string masked_number "nullable, last 4"
+    }
+    TRANSACTIONS {
+        uuid id PK
+        uuid account_id FK
+        string external_id UK
+        date date
+        string raw_description
+        decimal amount "positive in, negative out"
+        string currency
+        decimal balance_after "nullable"
+    }
 ```
 
-Slice-1 tables: `users`, `auth_sessions`, `households`, `household_members`. Registering a user
-creates a personal household with an `owner` membership; shared households and invitations come
-with the household-sharing slice.
+Built tables: `users`, `auth_sessions`, `households`, `household_members` (slice 1);
+`bank_connections`, `accounts`, `transactions` (slice 2). Registering a user creates a personal
+household with an `owner` membership; shared households and invitations come with the
+household-sharing slice.
+
+## Bank sync flow (Flinks)
+
+1. Web/mobile embeds the Flinks Connect iframe; the user picks their institution (Neo, EQ,
+   big-five, etc.), logs in, and consents.
+2. The widget's `REDIRECT` postMessage event delivers a `loginId`; the client POSTs it to
+   `/v1/connections/`.
+3. The backend encrypts and stores the `loginId`, exchanges it for a `requestId` via
+   `/Authorize`, then pulls accounts + up to 365 days of transactions with `/GetAccountsDetail`
+   (polling the async variant on 202).
+4. Accounts and transactions upsert idempotently on `external_id`; `POST
+   /v1/connections/{id}/sync` re-pulls on demand. Debits/credits normalize to signed amounts.
+
+See [ADR 0005](adr/0005-flinks-over-plaid.md) for why Flinks over Plaid.
 
 ## Auth flow
 
@@ -115,10 +163,10 @@ Written now:
 - 0002 - modular monolith backend
 - 0003 - access/refresh token strategy
 - 0004 - MFA: TOTP first, passkeys next
+- 0005 - Flinks over Plaid for bank aggregation
 
 Expected as the build progresses:
 
-- Plaid behind a provider interface (slice 2)
 - Enrichment cascade stage ordering and confidence thresholds (slices 3-4)
 - Embedding store and model choice for merchant matching (slice 4)
 - Chart DSL for assistant-embedded visualizations (slice 6)

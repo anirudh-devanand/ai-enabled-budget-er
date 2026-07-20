@@ -1,9 +1,12 @@
 import type {
+  AccountResponse,
+  ConnectionResponse,
   HouseholdDetailResponse,
   HouseholdResponse,
   LoginResponse,
   MfaEnrollResponse,
   TokenPair,
+  TransactionListResponse,
   UserResponse,
 } from "./types";
 
@@ -171,5 +174,52 @@ export class LedgerClient {
     return this.request<HouseholdDetailResponse>("GET", `/v1/households/${id}`, undefined, {
       auth: true,
     });
+  }
+
+  // --- bank connections ---
+
+  createConnection(householdId: string, loginId: string) {
+    return this.request<ConnectionResponse>(
+      "POST",
+      "/v1/connections/",
+      { household_id: householdId, login_id: loginId },
+      { auth: true },
+    );
+  }
+
+  syncConnection(connectionId: string) {
+    return this.request<ConnectionResponse>(
+      "POST",
+      `/v1/connections/${connectionId}/sync`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  listConnections(householdId: string) {
+    return this.request<ConnectionResponse[]>(
+      "GET",
+      `/v1/connections/?household_id=${householdId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  listAccounts(householdId: string) {
+    return this.request<AccountResponse[]>(
+      "GET",
+      `/v1/connections/accounts?household_id=${householdId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  listTransactions(householdId: string, limit = 50, offset = 0) {
+    return this.request<TransactionListResponse>(
+      "GET",
+      `/v1/connections/transactions?household_id=${householdId}&limit=${limit}&offset=${offset}`,
+      undefined,
+      { auth: true },
+    );
   }
 }

@@ -9,6 +9,7 @@ from app.core.database import Base
 
 # Import models so they register on Base.metadata.
 from app.auth import models as _auth_models  # noqa: F401
+from app.connections import models as _connection_models  # noqa: F401
 from app.households import models as _household_models  # noqa: F401
 from app.users import models as _user_models  # noqa: F401
 
