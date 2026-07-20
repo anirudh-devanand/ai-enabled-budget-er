@@ -16,6 +16,8 @@ from app.connections.schemas import (
 )
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.enrichment.normalize import prettify_descriptor
+from app.enrichment.service import enrichment_maps
 from app.users.models import User
 
 router = APIRouter(prefix="/v1/connections", tags=["connections"])
@@ -84,9 +86,32 @@ async def list_transactions(
     db: DbDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    needs_review: bool | None = None,
 ):
     await _require_membership(db, user, household_id)
-    items, total = await service.list_transactions(db, household_id, limit, offset)
-    return TransactionListResponse(
-        items=[TransactionResponse.model_validate(t) for t in items], total=total
+    items, total = await service.list_transactions(
+        db, household_id, limit, offset, needs_review
     )
+    enrichments, merchants, categories = await enrichment_maps(db, [t.id for t in items])
+
+    responses = []
+    for t in items:
+        enrichment = enrichments.get(t.id)
+        merchant = merchants.get(enrichment.merchant_id) if enrichment else None
+        category = categories.get(enrichment.category_id) if enrichment else None
+        responses.append(
+            TransactionResponse(
+                id=t.id,
+                account_id=t.account_id,
+                date=t.date,
+                raw_description=t.raw_description,
+                amount=t.amount,
+                currency=t.currency,
+                display_name=merchant.name if merchant else prettify_descriptor(t.raw_description),
+                merchant_name=merchant.name if merchant else None,
+                category_id=category.id if category else None,
+                category_name=category.name if category else None,
+                needs_review=enrichment.needs_review if enrichment else True,
+            )
+        )
+    return TransactionListResponse(items=responses, total=total)

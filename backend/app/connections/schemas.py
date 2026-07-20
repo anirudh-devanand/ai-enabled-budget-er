@@ -44,6 +44,12 @@ class TransactionResponse(BaseModel):
     raw_description: str
     amount: Decimal
     currency: str
+    # Enrichment: what the UI should actually show.
+    display_name: str
+    merchant_name: str | None = None
+    category_id: uuid.UUID | None = None
+    category_name: str | None = None
+    needs_review: bool = True
 
 
 class TransactionListResponse(BaseModel):

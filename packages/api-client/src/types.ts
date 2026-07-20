@@ -71,9 +71,28 @@ export interface TransactionResponse {
   raw_description: string;
   amount: string;
   currency: string;
+  display_name: string;
+  merchant_name: string | null;
+  category_id: string | null;
+  category_name: string | null;
+  needs_review: boolean;
 }
 
 export interface TransactionListResponse {
   items: TransactionResponse[];
   total: number;
+}
+
+export interface CategoryResponse {
+  id: string;
+  slug: string;
+  name: string;
+  parent_id: string | null;
+}
+
+export interface TransactionCorrectionResponse {
+  transaction_id: string;
+  category_id: string;
+  merchant_name: string | null;
+  reapplied_count: number;
 }

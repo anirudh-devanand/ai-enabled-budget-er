@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.connections.models import Account, BankConnection, Transaction
 from app.connections.provider import BankProvider, ProviderSnapshot
 from app.core.security import decrypt_secret, encrypt_secret
+from app.enrichment.service import enrich_transactions
 from app.households.models import HouseholdMember
 
 
@@ -44,7 +45,8 @@ async def sync_connection(
         connection.status = "error"
         await db.commit()
         raise
-    await _apply_snapshot(db, connection, snapshot)
+    new_transactions = await _apply_snapshot(db, connection, snapshot)
+    await enrich_transactions(db, connection.household_id, new_transactions)
     connection.institution_name = snapshot.institution_name
     connection.status = "active"
     connection.last_synced_at = datetime.now(UTC)
@@ -55,7 +57,8 @@ async def sync_connection(
 
 async def _apply_snapshot(
     db: AsyncSession, connection: BankConnection, snapshot: ProviderSnapshot
-) -> None:
+) -> list[Transaction]:
+    new_transactions: list[Transaction] = []
     existing_accounts = {
         a.external_id: a
         for a in (
@@ -91,18 +94,19 @@ async def _apply_snapshot(
         for txn in provider_account.transactions:
             if txn.external_id in existing_ids:
                 continue
-            db.add(
-                Transaction(
-                    account_id=account.id,
-                    external_id=txn.external_id,
-                    date=txn.date,
-                    raw_description=txn.description,
-                    amount=txn.amount,
-                    currency=txn.currency,
-                    balance_after=txn.balance,
-                )
+            row = Transaction(
+                account_id=account.id,
+                external_id=txn.external_id,
+                date=txn.date,
+                raw_description=txn.description,
+                amount=txn.amount,
+                currency=txn.currency,
+                balance_after=txn.balance,
             )
+            db.add(row)
+            new_transactions.append(row)
     await db.flush()
+    return new_transactions
 
 
 async def get_connection_for_user(
@@ -114,6 +118,25 @@ async def get_connection_for_user(
     if not await user_in_household(db, user_id, connection.household_id):
         return None
     return connection
+
+
+async def get_transaction_for_user(
+    db: AsyncSession, transaction_id: uuid.UUID, user_id: uuid.UUID
+) -> tuple[Transaction, uuid.UUID] | None:
+    """Returns (transaction, household_id) if the user can access it."""
+    result = await db.execute(
+        select(Transaction, BankConnection.household_id)
+        .join(Account, Account.id == Transaction.account_id)
+        .join(BankConnection, BankConnection.id == Account.connection_id)
+        .where(Transaction.id == transaction_id)
+    )
+    row = result.first()
+    if row is None:
+        return None
+    transaction, household_id = row
+    if not await user_in_household(db, user_id, household_id):
+        return None
+    return transaction, household_id
 
 
 async def list_connections(db: AsyncSession, household_id: uuid.UUID) -> list[BankConnection]:
@@ -136,14 +159,24 @@ async def list_accounts(db: AsyncSession, household_id: uuid.UUID) -> list[Accou
 
 
 async def list_transactions(
-    db: AsyncSession, household_id: uuid.UUID, limit: int, offset: int
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    needs_review: bool | None = None,
 ) -> tuple[list[Transaction], int]:
+    from app.enrichment.models import TransactionEnrichment
+
     base = (
         select(Transaction)
         .join(Account, Account.id == Transaction.account_id)
         .join(BankConnection, BankConnection.id == Account.connection_id)
         .where(BankConnection.household_id == household_id)
     )
+    if needs_review is not None:
+        base = base.join(
+            TransactionEnrichment, TransactionEnrichment.transaction_id == Transaction.id
+        ).where(TransactionEnrichment.needs_review.is_(needs_review))
     total = (
         await db.execute(select(func.count()).select_from(base.subquery()))
     ).scalar_one()

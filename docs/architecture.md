@@ -20,6 +20,7 @@ ai-enabled-budget-er/
       users/        user profile endpoints
       households/   household + membership endpoints
       connections/  Flinks provider, bank connections, accounts, transactions
+      enrichment/   categorization cascade: normalizer, rules, corrections
     alembic/        migrations
     tests/
   docs/
@@ -32,8 +33,8 @@ ai-enabled-budget-er/
 
 The backend is a modular monolith: one deployable, organized by domain so a domain can be split
 into its own service later without a rewrite. `connections/` (Flinks aggregation) landed in
-slice 2; future domains: `enrichment`, `budgets`, `goals`, `planner`, `assistant`,
-`notifications`.
+slice 2 and `enrichment/` (categorization) in slice 3; future domains: `budgets`, `goals`,
+`planner`, `assistant`, `notifications`.
 
 ## Entity-relationship diagram
 
@@ -126,9 +127,20 @@ erDiagram
 ```
 
 Built tables: `users`, `auth_sessions`, `households`, `household_members` (slice 1);
-`bank_connections`, `accounts`, `transactions` (slice 2). Registering a user creates a personal
+`bank_connections`, `accounts`, `transactions` (slice 2); `categories`, `merchants`,
+`transaction_enrichments`, `category_rules` (slice 3). Registering a user creates a personal
 household with an `owner` membership; shared households and invitations come with the
 household-sharing slice.
+
+## Categorization cascade
+
+Every synced transaction gets a `transaction_enrichments` row recording which stage resolved
+it and at what confidence: per-household **user rules** (exact match on the normalized
+descriptor, created from corrections) -> **global rules** (regex table of Canadian merchants
+and bank patterns) -> **unresolved** (`needs_review`, surfaced in the UI for a one-tap fix).
+Corrections upsert a durable household rule and re-apply to matching history, so the same
+descriptor is never miscategorized twice. Raw descriptors never render in the UI - unresolved
+rows fall back to a prettified name. Details in [ADR 0006](adr/0006-enrichment-cascade.md).
 
 ## Bank sync flow (Flinks)
 
@@ -164,10 +176,9 @@ Written now:
 - 0003 - access/refresh token strategy
 - 0004 - MFA: TOTP first, passkeys next
 - 0005 - Flinks over Plaid for bank aggregation
+- 0006 - enrichment cascade design
 
 Expected as the build progresses:
-
-- Enrichment cascade stage ordering and confidence thresholds (slices 3-4)
 - Embedding store and model choice for merchant matching (slice 4)
 - Chart DSL for assistant-embedded visualizations (slice 6)
 - Deterministic projection engine for the planner (slice 7)

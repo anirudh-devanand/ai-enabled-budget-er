@@ -4,8 +4,9 @@ Personal finance platform for Canada: live bank sync (including fintechs like Ne
 EQ Bank via Flinks), transaction categorization that never shows a vague merchant, rich
 visualizations, and an AI budget planner. iOS + Android + web on one backend.
 
-**Status:** early development. Auth and bank sync are working end to end; the categorization
-pipeline is next.
+**Status:** early development. Auth, bank sync, and rule-based categorization with a
+user-correction feedback loop are working end to end; embedding and LLM resolution stages are
+next.
 
 ## What works today
 
@@ -16,8 +17,13 @@ pipeline is next.
 - Households with owner/member roles; a personal household is created on signup
 - Bank connections via the Flinks Connect widget: link any supported Canadian institution and
   pull accounts + up to 365 days of transactions; idempotent re-sync on demand
+- Categorization cascade: descriptor normalization, per-household user rules, and a global
+  rules table (Canadian merchants + bank patterns); unresolved transactions are flagged for a
+  one-tap fix that creates a durable rule and re-applies to matching history - the same
+  descriptor is never miscategorized twice
 - Web app (Next.js): register, sign in (incl. MFA challenge), connect a bank, dashboard with
-  balances and recent transactions
+  balances, and a transactions page with clean merchant names, category chips, and a
+  needs-review correction flow
 - Mobile app (Expo): sign-in flow with refresh tokens in the platform keychain
 - Shared TypeScript API client used by both frontends
 
@@ -95,9 +101,9 @@ python -m pytest -q
 
 1. ~~Auth, users, households~~ (done)
 2. ~~Flinks bank connections + transaction sync~~ (done)
-3. Categorization pipeline (rules -> embeddings -> LLM -> user feedback loop); raw descriptors
-   stop appearing in the UI once this lands
-4. Budgets and core visualizations (net worth, cash flow, category trends, Sankey)
-5. AI assistant with tool-calling
-6. AI budget planner with goal re-forecasting and scenario modeling
-7. Scheduled nightly re-sync, notifications, household sharing, hardening
+3. ~~Categorization: normalizer + rules + user feedback loop~~ (done)
+4. Embedding + LLM resolution stages for the long tail of descriptors
+5. Budgets and core visualizations (net worth, cash flow, category trends, Sankey)
+6. AI assistant with tool-calling
+7. AI budget planner with goal re-forecasting and scenario modeling
+8. Scheduled nightly re-sync, notifications, household sharing, hardening

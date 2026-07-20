@@ -54,6 +54,7 @@ export default function DashboardPage() {
       <header>
         <h1>Welcome back, {user.display_name}</h1>
         <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => router.push("/transactions")}>Transactions</button>
           {household && (
             <button onClick={() => router.push(`/connect?household=${household.id}`)}>
               Connect a bank
@@ -118,7 +119,12 @@ export default function DashboardPage() {
                     flexGrow: 1,
                   }}
                 >
-                  {t.raw_description}
+                  {t.display_name}
+                  {t.category_name && (
+                    <span className="badge" style={{ marginLeft: 10, marginTop: 0 }}>
+                      {t.category_name}
+                    </span>
+                  )}
                 </span>
                 <span
                   style={{

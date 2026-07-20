@@ -1,11 +1,13 @@
 import type {
   AccountResponse,
+  CategoryResponse,
   ConnectionResponse,
   HouseholdDetailResponse,
   HouseholdResponse,
   LoginResponse,
   MfaEnrollResponse,
   TokenPair,
+  TransactionCorrectionResponse,
   TransactionListResponse,
   UserResponse,
 } from "./types";
@@ -214,11 +216,27 @@ export class LedgerClient {
     );
   }
 
-  listTransactions(householdId: string, limit = 50, offset = 0) {
+  listTransactions(householdId: string, limit = 50, offset = 0, needsReview?: boolean) {
+    const review = needsReview === undefined ? "" : `&needs_review=${needsReview}`;
     return this.request<TransactionListResponse>(
       "GET",
-      `/v1/connections/transactions?household_id=${householdId}&limit=${limit}&offset=${offset}`,
+      `/v1/connections/transactions?household_id=${householdId}&limit=${limit}&offset=${offset}${review}`,
       undefined,
+      { auth: true },
+    );
+  }
+
+  // --- categories & corrections ---
+
+  listCategories() {
+    return this.request<CategoryResponse[]>("GET", "/v1/categories/", undefined, { auth: true });
+  }
+
+  correctTransaction(transactionId: string, categoryId: string, merchantName?: string) {
+    return this.request<TransactionCorrectionResponse>(
+      "PATCH",
+      `/v1/transactions/${transactionId}/category`,
+      { category_id: categoryId, merchant_name: merchantName ?? null },
       { auth: true },
     );
   }
