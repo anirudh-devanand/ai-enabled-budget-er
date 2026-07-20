@@ -9,9 +9,13 @@ from app.core.database import Base
 
 # Import models so they register on Base.metadata.
 from app.auth import models as _auth_models  # noqa: F401
+from app.assistant import models as _assistant_models  # noqa: F401
+from app.budgets import models as _budget_models  # noqa: F401
 from app.connections import models as _connection_models  # noqa: F401
 from app.enrichment import models as _enrichment_models  # noqa: F401
 from app.households import models as _household_models  # noqa: F401
+from app.notifications import models as _notification_models  # noqa: F401
+from app.planner import models as _planner_models  # noqa: F401
 from app.users import models as _user_models  # noqa: F401
 
 config = context.config

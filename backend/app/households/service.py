@@ -56,3 +56,41 @@ async def get_household_for_user(
         .order_by(HouseholdMember.created_at)
     )
     return household, list(members.scalars().all())
+
+
+async def invite_member(
+    db: AsyncSession, household_id: uuid.UUID, owner_id: uuid.UUID, email: str
+) -> HouseholdMember:
+    """Add an existing user by email. Owner-only."""
+    membership = await db.execute(
+        select(HouseholdMember).where(
+            HouseholdMember.household_id == household_id,
+            HouseholdMember.user_id == owner_id,
+            HouseholdMember.role == "owner",
+        )
+    )
+    if membership.scalar_one_or_none() is None:
+        raise PermissionError("owner required")
+
+    invitee = (
+        await db.execute(select(User).where(User.email == email.lower()))
+    ).scalar_one_or_none()
+    if invitee is None:
+        raise LookupError("user not found")
+
+    existing = await db.execute(
+        select(HouseholdMember).where(
+            HouseholdMember.household_id == household_id,
+            HouseholdMember.user_id == invitee.id,
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise ValueError("already a member")
+
+    member = HouseholdMember(
+        household_id=household_id, user_id=invitee.id, role="member"
+    )
+    db.add(member)
+    await db.commit()
+    await db.refresh(member)
+    return member

@@ -96,3 +96,79 @@ export interface TransactionCorrectionResponse {
   merchant_name: string | null;
   reapplied_count: number;
 }
+
+export interface BudgetResponse {
+  id: string;
+  household_id: string;
+  name: string;
+  mode: string;
+  currency: string;
+}
+
+export interface BudgetCategoryStatus {
+  category_id: string;
+  target: string;
+  actual: string;
+  remaining: string;
+  rollover: boolean;
+}
+
+export interface BudgetDetailResponse extends BudgetResponse {
+  period_start: string | null;
+  period_end: string | null;
+  categories: BudgetCategoryStatus[];
+}
+
+export interface GoalResponse {
+  id: string;
+  household_id: string;
+  name: string;
+  type: string;
+  target_amount: string;
+  current_amount: string;
+  target_date: string | null;
+  status: string;
+}
+
+export interface PlanItemResponse {
+  id: string;
+  action: string;
+  amount: string;
+  rationale: string;
+  category_id: string | null;
+}
+
+export interface PlanResponse {
+  id: string;
+  goal_id: string;
+  summary: string;
+  monthly_surplus_needed: string;
+  projected_completion: string | null;
+  items: PlanItemResponse[];
+}
+
+export interface NetWorthResponse {
+  total: string;
+  currency: string;
+  accounts: { id: string; name: string; balance: string; type: string }[];
+}
+
+export interface NamedAmount {
+  name: string;
+  amount: string;
+  category_id?: string;
+  merchant_id?: string;
+}
+
+export interface MessageResponse {
+  id: string;
+  role: string;
+  content: string;
+  tool_name: string | null;
+}
+
+export interface ConversationResponse {
+  id: string;
+  household_id: string;
+  title: string;
+}

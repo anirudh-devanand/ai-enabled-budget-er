@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class HouseholdCreateRequest(BaseModel):
@@ -26,3 +26,7 @@ class HouseholdResponse(BaseModel):
 
 class HouseholdDetailResponse(HouseholdResponse):
     members: list[HouseholdMemberResponse]
+
+
+class HouseholdInviteRequest(BaseModel):
+    email: EmailStr

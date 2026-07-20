@@ -55,6 +55,10 @@ export default function DashboardPage() {
         <h1>Welcome back, {user.display_name}</h1>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={() => router.push("/transactions")}>Transactions</button>
+          <button onClick={() => router.push("/insights")}>Insights</button>
+          <button onClick={() => router.push("/budgets")}>Budgets</button>
+          <button onClick={() => router.push("/goals")}>Goals</button>
+          <button onClick={() => router.push("/assistant")}>Assistant</button>
           {household && (
             <button onClick={() => router.push(`/connect?household=${household.id}`)}>
               Connect a bank

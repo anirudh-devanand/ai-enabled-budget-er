@@ -1,19 +1,26 @@
+import json
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections.models import Account, BankConnection, Transaction
-from app.enrichment.models import Category, CategoryRule, Merchant, TransactionEnrichment
+from app.core.config import get_settings
+from app.core.llm import LlmClient, get_llm_client, propose_merchant_category
+from app.enrichment.embeddings import cosine_similarity, embed_text, token_overlap, tokens
+from app.enrichment.models import (
+    Category,
+    CategoryRule,
+    DescriptorEmbedding,
+    Merchant,
+    TransactionEnrichment,
+)
 from app.enrichment.normalize import normalize_descriptor
 from app.enrichment.rules import DEFAULT_CATEGORIES, match_global_rule
 
 
 async def ensure_default_categories(db: AsyncSession) -> dict[str, Category]:
-    """Idempotently seed the global taxonomy; returns slug -> Category."""
-    existing = {
-        c.slug: c for c in (await db.execute(select(Category))).scalars()
-    }
+    existing = {c.slug: c for c in (await db.execute(select(Category))).scalars()}
     created = False
     for slug, name in DEFAULT_CATEGORIES:
         if slug not in existing:
@@ -45,19 +52,92 @@ async def _household_rules(
     return {rule.normalized_pattern: rule for rule in result.scalars()}
 
 
-async def enrich_transactions(
-    db: AsyncSession, household_id: uuid.UUID, transactions: list[Transaction]
+async def index_descriptor(
+    db: AsyncSession,
+    normalized: str,
+    merchant_id: uuid.UUID | None,
+    category_id: uuid.UUID,
+    household_id: uuid.UUID | None,
 ) -> None:
-    """Run the cascade over transactions that don't have an enrichment yet.
+    """Upsert an embedding so future similar descriptors can match."""
+    result = await db.execute(
+        select(DescriptorEmbedding).where(
+            DescriptorEmbedding.household_id == household_id,
+            DescriptorEmbedding.normalized_pattern == normalized,
+        )
+    )
+    row = result.scalar_one_or_none()
+    vector = embed_text(normalized)
+    if row is None:
+        db.add(
+            DescriptorEmbedding(
+                household_id=household_id,
+                normalized_pattern=normalized,
+                embedding_json=json.dumps(vector),
+                merchant_id=merchant_id,
+                category_id=category_id,
+            )
+        )
+    else:
+        row.merchant_id = merchant_id
+        row.category_id = category_id
+        row.embedding_json = json.dumps(vector)
+    await db.flush()
 
-    Stage order: per-household user rules -> global rules -> unresolved
-    (flagged for one-tap review). Embedding and LLM stages arrive in the next
-    slice and will slot in before "unresolved".
-    """
+
+async def _match_embedding(
+    db: AsyncSession, household_id: uuid.UUID, normalized: str
+) -> DescriptorEmbedding | None:
+    """Nearest resolved descriptor by token overlap (primary) and cosine (tie-break)."""
+    query_vec = embed_text(normalized)
+    result = await db.execute(
+        select(DescriptorEmbedding).where(
+            or_(
+                DescriptorEmbedding.household_id == household_id,
+                DescriptorEmbedding.household_id.is_(None),
+            )
+        )
+    )
+    best: DescriptorEmbedding | None = None
+    best_score = 0.0
+    for row in result.scalars():
+        overlap = token_overlap(normalized, row.normalized_pattern)
+        try:
+            vec = json.loads(row.embedding_json)
+            cos = cosine_similarity(query_vec, vec)
+        except json.JSONDecodeError:
+            cos = 0.0
+        score = overlap * 0.75 + cos * 0.25
+        shared = tokens(normalized) & tokens(row.normalized_pattern)
+        if len(shared) < 2 and overlap < 0.5:
+            continue
+        if score > best_score:
+            best_score = score
+            best = row
+    if best is None:
+        return None
+    if len(tokens(normalized) & tokens(best.normalized_pattern)) >= 2 and token_overlap(
+        normalized, best.normalized_pattern
+    ) >= 0.4:
+        return best
+    if best_score < 0.45:
+        return None
+    return best
+
+
+async def enrich_transactions(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    transactions: list[Transaction],
+    llm: LlmClient | None = None,
+) -> None:
+    """Cascade: user rules -> global rules -> embedding -> LLM -> unresolved."""
     if not transactions:
         return
     categories = await ensure_default_categories(db)
     user_rules = await _household_rules(db, household_id)
+    llm = llm if llm is not None else get_llm_client()
+    settings = get_settings()
 
     existing_ids = {
         row
@@ -101,15 +181,58 @@ async def enrich_transactions(
             merchant_id = None
             if global_rule.merchant is not None:
                 merchant_id = (await merchant_for(global_rule.merchant)).id
+            category_id = categories[global_rule.category_slug].id
             db.add(
                 TransactionEnrichment(
                     transaction_id=txn.id,
                     merchant_id=merchant_id,
-                    category_id=categories[global_rule.category_slug].id,
+                    category_id=category_id,
                     stage="global_rule",
                     confidence=global_rule.confidence,
                     needs_review=False,
                 )
+            )
+            await index_descriptor(db, normalized, merchant_id, category_id, None)
+            continue
+
+        emb = await _match_embedding(db, household_id, normalized)
+        if emb is not None:
+            db.add(
+                TransactionEnrichment(
+                    transaction_id=txn.id,
+                    merchant_id=emb.merchant_id,
+                    category_id=emb.category_id,
+                    stage="embedding",
+                    confidence=settings.embedding_match_threshold,
+                    needs_review=False,
+                )
+            )
+            continue
+
+        proposal = await propose_merchant_category(
+            llm,
+            txn.raw_description,
+            str(txn.amount),
+            list(categories.keys()),
+        )
+        if (
+            proposal is not None
+            and proposal.confidence >= settings.llm_enrichment_min_confidence
+        ):
+            merchant = await merchant_for(proposal.merchant_name)
+            category_id = categories[proposal.category_slug].id
+            db.add(
+                TransactionEnrichment(
+                    transaction_id=txn.id,
+                    merchant_id=merchant.id,
+                    category_id=category_id,
+                    stage="llm",
+                    confidence=proposal.confidence,
+                    needs_review=False,
+                )
+            )
+            await index_descriptor(
+                db, normalized, merchant.id, category_id, household_id
             )
             continue
 
@@ -129,12 +252,6 @@ async def correct_transaction(
     category_id: uuid.UUID,
     merchant_name: str | None,
 ) -> tuple[TransactionEnrichment, int]:
-    """Apply a user correction and make it durable.
-
-    Creates/updates a household rule keyed on the normalized descriptor and
-    re-applies it to every other matching transaction in the household that a
-    user hasn't already corrected. Returns (enrichment, reapplied_count).
-    """
     merchant = await get_or_create_merchant(db, merchant_name) if merchant_name else None
     merchant_id = merchant.id if merchant else None
     normalized = normalize_descriptor(transaction.raw_description)
@@ -173,6 +290,7 @@ async def correct_transaction(
     rule.merchant_id = merchant_id
     rule.category_id = category_id
     await db.flush()
+    await index_descriptor(db, normalized, merchant_id, category_id, household_id)
 
     reapplied = await _reapply_rule(db, household_id, normalized, transaction.id, rule)
     await db.commit()
@@ -218,7 +336,7 @@ async def _reapply_rule(
             enrichment = TransactionEnrichment(transaction_id=txn.id)
             db.add(enrichment)
         elif enrichment.stage == "user_correction":
-            continue  # never overwrite an explicit correction
+            continue
         enrichment.merchant_id = rule.merchant_id
         enrichment.category_id = rule.category_id
         enrichment.stage = "user_rule"
@@ -231,8 +349,11 @@ async def _reapply_rule(
 
 async def enrichment_maps(
     db: AsyncSession, transaction_ids: list[uuid.UUID]
-) -> tuple[dict[uuid.UUID, TransactionEnrichment], dict[uuid.UUID, Merchant], dict[uuid.UUID, Category]]:
-    """Bulk-load enrichments plus referenced merchants/categories for a listing."""
+) -> tuple[
+    dict[uuid.UUID, TransactionEnrichment],
+    dict[uuid.UUID, Merchant],
+    dict[uuid.UUID, Category],
+]:
     if not transaction_ids:
         return {}, {}, {}
     enrichments = {

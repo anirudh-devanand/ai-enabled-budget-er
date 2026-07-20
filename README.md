@@ -4,9 +4,8 @@ Personal finance platform for Canada: live bank sync (including fintechs like Ne
 EQ Bank via Flinks), transaction categorization that never shows a vague merchant, rich
 visualizations, and an AI budget planner. iOS + Android + web on one backend.
 
-**Status:** early development. Auth, bank sync, and rule-based categorization with a
-user-correction feedback loop are working end to end; embedding and LLM resolution stages are
-next.
+**Status:** MVP feature set in place through planner and assistant. Optional LLM key unlocks
+richer narration; everything else runs offline against Flinks sandbox + rule/embedding cascade.
 
 ## What works today
 
@@ -14,18 +13,18 @@ next.
 - Short-lived access tokens (15 min) + rotating refresh tokens with server-side sessions,
   logout, and logout-all-devices
 - TOTP two-factor auth: enroll, activate, and challenge on login
-- Households with owner/member roles; a personal household is created on signup
-- Bank connections via the Flinks Connect widget: link any supported Canadian institution and
-  pull accounts + up to 365 days of transactions; idempotent re-sync on demand
-- Categorization cascade: descriptor normalization, per-household user rules, and a global
-  rules table (Canadian merchants + bank patterns); unresolved transactions are flagged for a
-  one-tap fix that creates a durable rule and re-applies to matching history - the same
-  descriptor is never miscategorized twice
-- Web app (Next.js): register, sign in (incl. MFA challenge), connect a bank, dashboard with
-  balances, and a transactions page with clean merchant names, category chips, and a
-  needs-review correction flow
-- Mobile app (Expo): sign-in flow with refresh tokens in the platform keychain
-- Shared TypeScript API client used by both frontends
+- Households with owner/member roles; invite an existing user by email; personal household on signup
+- Bank connections via the Flinks Connect widget (Neo, EQ, big five, etc.); pull sync +
+  `POST /v1/ops/sync-all` for batch refresh
+- Categorization cascade: normalize -> user rules -> global rules -> token/embedding match ->
+  optional LLM -> needs-review. Corrections teach the household permanently
+- Budgets (flexible / zero-based) with propose-from-history and target vs actual
+- Metrics: net worth, cash flow, spending by category/merchant, Sankey payload
+- Goals + deterministic AI planner (monthly needed, cuts, scenario modeling - math never from LLM)
+- AI assistant with tool-calling (works offline from live tools; Anthropic when `LEDGER_LLM_API_KEY` set)
+- Notifications for sync events
+- Web: dashboard, connect, transactions, insights, budgets, goals, assistant
+- Mobile: Expo sign-in shell; Shared TypeScript API client
 
 ## Architecture
 
@@ -40,6 +39,7 @@ flowchart LR
     pg[(PostgreSQL)]
     flinks[Flinks aggregation]
     banks[(Banks & fintechs<br/>Neo, EQ, big five)]
+    llm[Optional LLM]
 
     web --> client
     mobile --> client
@@ -47,32 +47,19 @@ flowchart LR
     api --> pg
     api -->|Authorize / GetAccountsDetail| flinks
     flinks --> banks
+    api -.->|enrichment + assistant| llm
 ```
 
-The backend is a modular monolith (domain packages: `auth`, `users`, `households`, with
-`connections`, `transactions`, `enrichment`, `budgets`, `planner` planned). Details and ERD in
-[docs/architecture.md](docs/architecture.md); decisions in [docs/adr/](docs/adr/).
+Domains: `auth`, `users`, `households`, `connections`, `enrichment`, `budgets`, `metrics`,
+`planner`, `assistant`, `notifications`. See [docs/architecture.md](docs/architecture.md) and
+[docs/adr/](docs/adr/).
 
 ## Run it
 
-Backend + database:
-
 ```bash
 docker compose up --build
-# API on http://localhost:8000, docs at /docs
+# API http://localhost:8000  docs /docs
 ```
-
-Or natively:
-
-```bash
-cd backend
-python -m venv .venv && .venv/Scripts/activate  # or source .venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head   # needs LEDGER_DATABASE_URL pointing at Postgres
-uvicorn app.main:app --reload
-```
-
-Web:
 
 ```bash
 npm install --workspace packages/api-client --workspace apps/web
@@ -80,30 +67,23 @@ npm run dev --workspace apps/web
 # http://localhost:3000
 ```
 
-Bank sync points at the public Flinks sandbox by default (fake institutions, no keys needed).
-For a real instance set `LEDGER_FLINKS_BASE_URL`, `LEDGER_FLINKS_CUSTOMER_ID`, and
-`LEDGER_FLINKS_AUTH_KEY` on the backend, plus `NEXT_PUBLIC_FLINKS_IFRAME_URL` on the web app.
-
-Tests:
+Optional: set `LEDGER_LLM_API_KEY` (Anthropic) for LLM enrichment and richer assistant replies.
+Flinks sandbox needs no keys; for a real instance set `LEDGER_FLINKS_*` and
+`NEXT_PUBLIC_FLINKS_IFRAME_URL`.
 
 ```bash
-cd backend
-python -m pytest -q
+cd backend && python -m pytest -q
 ```
-
-## Docs
-
-- [Architecture + ERD](docs/architecture.md)
-- [ADRs](docs/adr/)
-- [Market research](docs/market-research.md)
 
 ## Roadmap
 
-1. ~~Auth, users, households~~ (done)
-2. ~~Flinks bank connections + transaction sync~~ (done)
-3. ~~Categorization: normalizer + rules + user feedback loop~~ (done)
-4. Embedding + LLM resolution stages for the long tail of descriptors
-5. Budgets and core visualizations (net worth, cash flow, category trends, Sankey)
-6. AI assistant with tool-calling
-7. AI budget planner with goal re-forecasting and scenario modeling
-8. Scheduled nightly re-sync, notifications, household sharing, hardening
+1. ~~Auth, users, households~~
+2. ~~Flinks bank sync~~
+3. ~~Rules + correction feedback loop~~
+4. ~~Embedding / soft-match + optional LLM enrichment~~
+5. ~~Budgets + metrics visualizations~~
+6. ~~AI assistant (tool-calling)~~
+7. ~~AI planner + scenarios~~
+8. ~~Batch sync + notifications + household invite~~
+9. Polish: MFA recovery codes, real embedding API, scheduled cron, mobile feature parity,
+   SOC 2 hardening docs

@@ -7,6 +7,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
 )
@@ -52,7 +53,7 @@ class TransactionEnrichment(Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("categories.id", ondelete="SET NULL"), default=None
     )
-    # Which pipeline stage resolved it: user_rule | user_correction | global_rule | unresolved
+    # user_rule | user_correction | global_rule | embedding | llm | unresolved
     stage: Mapped[str] = mapped_column(String(20), default="unresolved")
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     needs_review: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -62,11 +63,7 @@ class TransactionEnrichment(Base):
 
 
 class CategoryRule(Base):
-    """Durable per-household override created from a user correction.
-
-    Matched on the normalized descriptor, so the same messy string can never be
-    miscategorized twice for that household.
-    """
+    """Durable per-household override created from a user correction."""
 
     __tablename__ = "category_rules"
     __table_args__ = (UniqueConstraint("household_id", "normalized_pattern"),)
@@ -84,5 +81,26 @@ class CategoryRule(Base):
     )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DescriptorEmbedding(Base):
+    """Indexed embeddings of resolved descriptors for nearest-neighbour matching."""
+
+    __tablename__ = "descriptor_embeddings"
+    __table_args__ = (UniqueConstraint("household_id", "normalized_pattern"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    household_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("households.id", ondelete="CASCADE"), index=True, default=None
+    )
+    normalized_pattern: Mapped[str] = mapped_column(String(200))
+    embedding_json: Mapped[str] = mapped_column(Text)
+    merchant_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("merchants.id", ondelete="SET NULL"), default=None
+    )
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("categories.id", ondelete="CASCADE")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

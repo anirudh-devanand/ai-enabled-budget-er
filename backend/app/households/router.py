@@ -10,6 +10,7 @@ from app.households import service
 from app.households.schemas import (
     HouseholdCreateRequest,
     HouseholdDetailResponse,
+    HouseholdInviteRequest,
     HouseholdMemberResponse,
     HouseholdResponse,
 )
@@ -43,3 +44,24 @@ async def get_household(household_id: uuid.UUID, user: CurrentUser, db: DbDep):
         created_at=household.created_at,
         members=[HouseholdMemberResponse.model_validate(m) for m in members],
     )
+
+
+@router.post(
+    "/{household_id}/invite",
+    response_model=HouseholdMemberResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def invite_member(
+    household_id: uuid.UUID,
+    body: HouseholdInviteRequest,
+    user: CurrentUser,
+    db: DbDep,
+):
+    try:
+        return await service.invite_member(db, household_id, user.id, body.email)
+    except PermissionError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Owner role required") from None
+    except LookupError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found") from None
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None

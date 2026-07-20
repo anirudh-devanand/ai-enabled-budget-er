@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     flinks_auth_key: str | None = None
     flinks_days_of_transactions: str = "Days365"
 
+    # Optional LLM (Anthropic). When unset, enrichment/assistant skip LLM stages.
+    llm_api_key: str | None = None
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-4-20250514"
+    embedding_match_threshold: float = 0.72
+    llm_enrichment_min_confidence: float = 0.7
+
 
 @lru_cache
 def get_settings() -> Settings:

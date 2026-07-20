@@ -1,11 +1,19 @@
 import type {
   AccountResponse,
+  BudgetDetailResponse,
+  BudgetResponse,
   CategoryResponse,
   ConnectionResponse,
+  ConversationResponse,
+  GoalResponse,
   HouseholdDetailResponse,
   HouseholdResponse,
   LoginResponse,
+  MessageResponse,
   MfaEnrollResponse,
+  NamedAmount,
+  NetWorthResponse,
+  PlanResponse,
   TokenPair,
   TransactionCorrectionResponse,
   TransactionListResponse,
@@ -237,6 +245,111 @@ export class LedgerClient {
       "PATCH",
       `/v1/transactions/${transactionId}/category`,
       { category_id: categoryId, merchant_name: merchantName ?? null },
+      { auth: true },
+    );
+  }
+
+  // --- budgets & metrics ---
+
+  createBudget(householdId: string, opts?: { propose?: boolean; name?: string }) {
+    return this.request<BudgetResponse>(
+      "POST",
+      "/v1/budgets/",
+      {
+        household_id: householdId,
+        name: opts?.name ?? "Monthly budget",
+        propose_from_history: opts?.propose ?? false,
+      },
+      { auth: true },
+    );
+  }
+
+  listBudgets(householdId: string) {
+    return this.request<BudgetResponse[]>(
+      "GET",
+      `/v1/budgets/?household_id=${householdId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  getBudget(budgetId: string) {
+    return this.request<BudgetDetailResponse>("GET", `/v1/budgets/${budgetId}`, undefined, {
+      auth: true,
+    });
+  }
+
+  getNetWorth(householdId: string) {
+    return this.request<NetWorthResponse>(
+      "GET",
+      `/v1/metrics/net-worth?household_id=${householdId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  getSpendingByCategory(householdId: string, days = 30) {
+    return this.request<NamedAmount[]>(
+      "GET",
+      `/v1/metrics/spending-by-category?household_id=${householdId}&days=${days}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  // --- goals & planner ---
+
+  createGoal(
+    householdId: string,
+    name: string,
+    targetAmount: string,
+    targetDate?: string,
+  ) {
+    return this.request<GoalResponse>(
+      "POST",
+      "/v1/goals/",
+      {
+        household_id: householdId,
+        name,
+        type: "save",
+        target_amount: targetAmount,
+        target_date: targetDate ?? null,
+      },
+      { auth: true },
+    );
+  }
+
+  listGoals(householdId: string) {
+    return this.request<GoalResponse[]>(
+      "GET",
+      `/v1/goals/?household_id=${householdId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  buildPlan(goalId: string) {
+    return this.request<PlanResponse>("POST", `/v1/goals/${goalId}/plan`, undefined, {
+      auth: true,
+    });
+  }
+
+  // --- assistant ---
+
+  createConversation(householdId: string) {
+    return this.request<ConversationResponse>(
+      "POST",
+      "/v1/assistant/conversations",
+      { household_id: householdId },
+      { auth: true },
+    );
+  }
+
+  sendChat(conversationId: string, message: string) {
+    return this.request<MessageResponse>(
+      "POST",
+      `/v1/assistant/conversations/${conversationId}/messages`,
+      { message },
       { auth: true },
     );
   }
