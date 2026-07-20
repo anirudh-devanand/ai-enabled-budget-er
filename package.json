@@ -1,0 +1,13 @@
+{
+  "name": "ledger",
+  "private": true,
+  "workspaces": [
+    "packages/api-client",
+    "apps/web",
+    "apps/mobile"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:web": "npm run build --workspace apps/web"
+  }
+}

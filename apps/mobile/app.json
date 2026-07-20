@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Ledger",
+    "slug": "ledger",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.ledger.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.ledger.app"
+    }
+  }
+}

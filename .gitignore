@@ -14,14 +14,20 @@ Thumbs.db
 *-anirudh.*
 *conflict*
 
-# Python / Node (for when build starts)
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-node_modules/
-dist/
-build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+.expo/
+*.tsbuildinfo
+next-env.d.ts
