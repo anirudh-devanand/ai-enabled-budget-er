@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_API_HOST"
+        "EXPO_PUBLIC_API_URL": "https://ledger-api-ayer.onrender.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_API_HOST"
+        "EXPO_PUBLIC_API_URL": "https://ledger-api-ayer.onrender.com"
       }
     }
   },

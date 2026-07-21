@@ -2,7 +2,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme";
 
 const WEB_HINT =
-  process.env.EXPO_PUBLIC_WEB_URL ?? "https://REPLACE_WITH_WEB_HOST/connect";
+  process.env.EXPO_PUBLIC_WEB_URL ?? "https://ledger-web-blue.vercel.app/connect";
 
 export function ConnectScreen() {
   return (
