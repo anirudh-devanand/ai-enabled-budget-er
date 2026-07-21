@@ -64,3 +64,33 @@ async def sync_all(
 ):
     """Trigger a full pull sync. Cron should send header X-Ops-Token."""
     return await service.sync_all_connections(db, provider)
+
+
+class SeedDemoBody(BaseModel):
+    email: str
+    days: int = 180
+    replace_existing_demo: bool = True
+
+
+@ops_router.post("/seed-demo-history")
+async def seed_demo_history(
+    body: SeedDemoBody,
+    db: DbDep,
+    _: Annotated[None, Depends(require_ops_token)],
+):
+    """Attach extensive fake Canadian bank history to a user for QA / demos."""
+    from app.ops.seed_demo import SeedDemoRequest, seed_demo_history as run_seed
+
+    try:
+        return await run_seed(
+            db,
+            SeedDemoRequest(
+                email=body.email,
+                days=body.days,
+                replace_existing_demo=body.replace_existing_demo,
+            ),
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(exc)) from exc

@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections import service
+from app.connections.demo_seed import DemoSeedProvider
 from app.connections.flinks import FlinksProvider
-from app.connections.provider import BankProvider, ProviderError
+from app.connections.provider import BankProvider, ProviderError, ProviderSnapshot
 from app.connections.schemas import (
     AccountResponse,
     ConnectionCreateRequest,
@@ -26,8 +27,21 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+class CompositeBankProvider:
+    """Route demo-seed:* login ids to the in-process generator; everything else to Flinks."""
+
+    def __init__(self) -> None:
+        self._flinks = FlinksProvider()
+        self._demo = DemoSeedProvider()
+
+    async def fetch_snapshot(self, login_id: str) -> ProviderSnapshot:
+        if login_id.startswith("demo-seed:"):
+            return await self._demo.fetch_snapshot(login_id)
+        return await self._flinks.fetch_snapshot(login_id)
+
+
 def get_provider() -> BankProvider:
-    return FlinksProvider()
+    return CompositeBankProvider()
 
 
 ProviderDep = Annotated[BankProvider, Depends(get_provider)]
