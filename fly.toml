@@ -1,0 +1,29 @@
+# fly.io — deploy from repo root: fly launch --config fly.toml --dockerfile backend/Dockerfile
+# Then: fly secrets set LEDGER_ENV=production LEDGER_JWT_SECRET=... LEDGER_DATABASE_URL=... \
+#   LEDGER_DATA_ENCRYPTION_KEY=... LEDGER_OPS_TOKEN=... LEDGER_CORS_ORIGINS=https://...
+
+app = "ledger-api"
+primary_region = "yyz"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+  ignorefile = "backend/.dockerignore"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

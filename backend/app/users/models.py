@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, String, Uuid
+from sqlalchemy import Boolean, DateTime, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -21,4 +21,6 @@ class User(Base):
     # Encrypted TOTP secret; set during MFA enrollment, active once mfa_enabled.
     mfa_secret: Mapped[str | None] = mapped_column(String(255), default=None)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # JSON list of sha256 hex hashes for one-time MFA recovery codes.
+    mfa_recovery_hashes: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

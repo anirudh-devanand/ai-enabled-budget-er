@@ -26,16 +26,18 @@ ai-enabled-budget-er/
   docs/
     adr/            architecture decision records
     architecture.md
+    deploy.md       production hosting runbook (Render/Fly + Vercel + EAS)
     market-research.md
   docker-compose.yml
+  render.yaml       Render Blueprint (API + Postgres)
+  fly.toml          Fly.io alternative for API
+  vercel.json       Vercel install/build for web workspace
   .github/workflows/ci.yml
 ```
 
 The backend is a modular monolith: one deployable, organized by domain so a domain can be split
-into its own service later without a rewrite. `connections/` (Flinks aggregation) landed in
-slice 2 and `enrichment/` (categorization) in slice 3; future domains: `budgets`, `goals`,
-`planner`, `assistant`, `notifications`.
-
+into its own service later without a rewrite. Domains shipped: `auth`, `users`, `households`,
+`connections`, `enrichment`, `budgets`, `metrics`, `planner`, `assistant`, `notifications`.
 ## Entity-relationship diagram
 
 Tables through slice 2 exist with full column detail below; the remaining entities are planned

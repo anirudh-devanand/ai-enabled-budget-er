@@ -1,3 +1,5 @@
+import json
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -16,6 +18,8 @@ from app.core.security import (
     hash_refresh_token,
 )
 from app.users.models import User
+
+RECOVERY_CODE_COUNT = 10
 
 
 async def issue_token_pair(
@@ -93,3 +97,41 @@ def verify_totp(user: User, code: str) -> bool:
         return False
     secret = decrypt_secret(user.mfa_secret)
     return pyotp.TOTP(secret).verify(code, valid_window=1)
+
+
+def _normalize_recovery_code(code: str) -> str:
+    return code.strip().upper().replace("-", "").replace(" ", "")
+
+
+def generate_recovery_codes() -> tuple[list[str], str]:
+    """Returns (plain codes shown once, JSON list of sha256 hashes)."""
+    codes = [
+        f"{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
+        for _ in range(RECOVERY_CODE_COUNT)
+    ]
+    hashes = [hash_refresh_token(_normalize_recovery_code(c)) for c in codes]
+    return codes, json.dumps(hashes)
+
+
+def consume_recovery_code(user: User, code: str) -> bool:
+    """Validate a one-time recovery code and remove its hash. Mutates user."""
+    if not user.mfa_recovery_hashes:
+        return False
+    try:
+        hashes: list[str] = json.loads(user.mfa_recovery_hashes)
+    except json.JSONDecodeError:
+        return False
+    digest = hash_refresh_token(_normalize_recovery_code(code))
+    if digest not in hashes:
+        return False
+    hashes.remove(digest)
+    user.mfa_recovery_hashes = json.dumps(hashes)
+    return True
+
+
+def verify_mfa_code(user: User, code: str) -> bool:
+    """Accept TOTP or a one-time recovery code (recovery mutates user)."""
+    cleaned = code.strip()
+    if len(cleaned) <= 8 and cleaned.isdigit():
+        return verify_totp(user, cleaned)
+    return consume_recovery_code(user, cleaned)

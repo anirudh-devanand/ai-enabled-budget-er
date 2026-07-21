@@ -2,16 +2,28 @@
   "expo": {
     "name": "Ledger",
     "slug": "ledger",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0e1116"
+    },
     "ios": {
-      "bundleIdentifier": "com.ledger.app",
-      "supportsTablet": false
+      "bundleIdentifier": "com.ledgerfinance.app",
+      "supportsTablet": false,
+      "buildNumber": "1"
     },
     "android": {
-      "package": "com.ledger.app"
+      "package": "com.ledgerfinance.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0e1116"
+      }
     }
   }
 }

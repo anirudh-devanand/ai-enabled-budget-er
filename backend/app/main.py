@@ -1,10 +1,15 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.assistant.router import router as assistant_router
 from app.auth.router import router as auth_router
 from app.budgets.router import router as budgets_router
 from app.connections.router import router as connections_router
 from app.core.config import get_settings
+from app.core.database import get_engine
 from app.enrichment.router import categories_router, transactions_router
 from app.households.router import router as households_router
 from app.metrics.router import router as metrics_router
@@ -14,7 +19,29 @@ from app.users.router import router as users_router
 
 settings = get_settings()
 
-app = FastAPI(title="Ledger API", version="0.1.0", debug=settings.debug)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Fail fast on boot if production secrets are missing.
+    get_settings().assert_production_safe()
+    yield
+
+
+app = FastAPI(
+    title="Ledger API",
+    version="0.2.0",
+    debug=settings.debug,
+    lifespan=lifespan,
+)
+
+origins = settings.cors_origin_list()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins if origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -32,4 +59,11 @@ app.include_router(ops_router)
 
 @app.get("/healthz", tags=["ops"])
 async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+    from fastapi import HTTPException
+
+    try:
+        async with get_engine().connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "up"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"status": "degraded", "database": "down"}) from exc

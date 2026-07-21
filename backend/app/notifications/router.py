@@ -1,12 +1,14 @@
+import secrets
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections.provider import BankProvider
 from app.connections.router import get_provider
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.notifications import service
@@ -18,6 +20,17 @@ ops_router = APIRouter(prefix="/v1/ops", tags=["ops"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ProviderDep = Annotated[BankProvider, Depends(get_provider)]
+
+
+def require_ops_token(x_ops_token: Annotated[str | None, Header()] = None) -> None:
+    settings = get_settings()
+    expected = settings.ops_token
+    if not expected:
+        if settings.env == "production":
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Ops token not configured")
+        return
+    if not x_ops_token or not secrets.compare_digest(x_ops_token, expected):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid ops token")
 
 
 class NotificationResponse(BaseModel):
@@ -44,6 +57,10 @@ async def mark_read(notification_id: uuid.UUID, user: CurrentUser, db: DbDep):
 
 
 @ops_router.post("/sync-all")
-async def sync_all(user: CurrentUser, db: DbDep, provider: ProviderDep):
-    """Trigger a full pull sync (cron can hit this with a service account later)."""
+async def sync_all(
+    db: DbDep,
+    provider: ProviderDep,
+    _: Annotated[None, Depends(require_ops_token)],
+):
+    """Trigger a full pull sync. Cron should send header X-Ops-Token."""
     return await service.sync_all_connections(db, provider)

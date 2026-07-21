@@ -24,8 +24,10 @@ richer narration; everything else runs offline against Flinks sandbox + rule/emb
 - AI assistant with tool-calling (works offline from live tools; Anthropic when `LEDGER_LLM_API_KEY` set)
 - Notifications for sync events
 - Web: dashboard, connect, transactions, insights, budgets, goals, assistant
-- Mobile: Expo sign-in shell; Shared TypeScript API client
-
+- Mobile: Expo app with home, transactions, budgets, goals, assistant, bank connect deep-link;
+  register/login/MFA/recovery codes; EAS profiles for preview APK / store builds
+- Production: CORS, DB health check, production secret gate, ops token for cron sync,
+  `.env.example`, Render/Fly/Vercel configs — [docs/deploy.md](docs/deploy.md)
 ## Architecture
 
 ```mermaid
@@ -85,5 +87,17 @@ cd backend && python -m pytest -q
 6. ~~AI assistant (tool-calling)~~
 7. ~~AI planner + scenarios~~
 8. ~~Batch sync + notifications + household invite~~
-9. Polish: MFA recovery codes, real embedding API, scheduled cron, mobile feature parity,
-   SOC 2 hardening docs
+9. ~~Production hardening~~ (CORS, secrets gate, health+DB, MFA recovery codes, ops token, deploy configs)
+10. ~~Mobile feature parity + EAS scaffolding~~
+11. Host API (Render/Fly) + web (Vercel) and ship a phone build — see [docs/deploy.md](docs/deploy.md)
+
+## Production deploy
+
+See **[docs/deploy.md](docs/deploy.md)** for Render/Fly + Vercel + Expo Go / EAS.
+
+```bash
+# Mobile against a public API
+cd apps/mobile
+set EXPO_PUBLIC_API_URL=https://YOUR_API_HOST
+npx expo start --tunnel
+```

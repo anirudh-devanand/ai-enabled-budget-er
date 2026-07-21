@@ -11,6 +11,7 @@ import type {
   LoginResponse,
   MessageResponse,
   MfaEnrollResponse,
+  MfaActivateResponse,
   NamedAmount,
   NetWorthResponse,
   PlanResponse,
@@ -161,7 +162,13 @@ export class LedgerClient {
   }
 
   activateMfa(code: string) {
-    return this.request<void>("POST", "/v1/auth/mfa/activate", { code }, { auth: true });
+    return this.request<MfaActivateResponse>("POST", "/v1/auth/mfa/activate", { code }, { auth: true });
+  }
+
+  regenerateRecoveryCodes() {
+    return this.request<MfaActivateResponse>("POST", "/v1/auth/mfa/recovery-codes", undefined, {
+      auth: true,
+    });
   }
 
   // --- users ---

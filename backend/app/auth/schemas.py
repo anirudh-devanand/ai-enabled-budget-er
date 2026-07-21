@@ -28,7 +28,8 @@ class MfaChallengeResponse(BaseModel):
 
 class MfaVerifyRequest(BaseModel):
     challenge_token: str
-    code: str = Field(min_length=6, max_length=8)
+    # TOTP (6–8 digits) or recovery code (e.g. ABCD-EF01).
+    code: str = Field(min_length=6, max_length=32)
 
 
 class RefreshRequest(BaseModel):
@@ -46,6 +47,14 @@ class MfaEnrollResponse(BaseModel):
 
 class MfaActivateRequest(BaseModel):
     code: str = Field(min_length=6, max_length=8)
+
+
+class MfaActivateResponse(BaseModel):
+    recovery_codes: list[str]
+
+
+class MfaRecoveryCodesResponse(BaseModel):
+    recovery_codes: list[str]
 
 
 class SessionInfo(BaseModel):

@@ -9,8 +9,10 @@ from app.auth.schemas import (
     LoginRequest,
     LogoutRequest,
     MfaActivateRequest,
+    MfaActivateResponse,
     MfaChallengeResponse,
     MfaEnrollResponse,
+    MfaRecoveryCodesResponse,
     MfaVerifyRequest,
     RefreshRequest,
     RegisterRequest,
@@ -70,8 +72,9 @@ async def mfa_verify(body: MfaVerifyRequest, db: DbDep, request: Request) -> Tok
     if user_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
     user = await db.get(User, user_id)
-    if user is None or not service.verify_totp(user, body.code):
+    if user is None or not service.verify_mfa_code(user, body.code):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code")
+    await db.commit()
     return await service.issue_token_pair(db, user.id, request.headers.get("user-agent"))
 
 
@@ -106,11 +109,24 @@ async def mfa_enroll(user: CurrentUser, db: DbDep) -> MfaEnrollResponse:
     return MfaEnrollResponse(secret=secret, otpauth_uri=uri)
 
 
-@router.post("/mfa/activate", status_code=status.HTTP_204_NO_CONTENT)
-async def mfa_activate(body: MfaActivateRequest, user: CurrentUser, db: DbDep) -> None:
+@router.post("/mfa/activate", response_model=MfaActivateResponse)
+async def mfa_activate(body: MfaActivateRequest, user: CurrentUser, db: DbDep) -> MfaActivateResponse:
     if user.mfa_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "MFA already enabled")
     if not service.verify_totp(user, body.code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid code")
+    codes, hashes = service.generate_recovery_codes()
     user.mfa_enabled = True
+    user.mfa_recovery_hashes = hashes
     await db.commit()
+    return MfaActivateResponse(recovery_codes=codes)
+
+
+@router.post("/mfa/recovery-codes", response_model=MfaRecoveryCodesResponse)
+async def regenerate_recovery_codes(user: CurrentUser, db: DbDep) -> MfaRecoveryCodesResponse:
+    if not user.mfa_enabled:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "MFA is not enabled")
+    codes, hashes = service.generate_recovery_codes()
+    user.mfa_recovery_hashes = hashes
+    await db.commit()
+    return MfaRecoveryCodesResponse(recovery_codes=codes)

@@ -40,6 +40,10 @@ export interface MfaEnrollResponse {
   otpauth_uri: string;
 }
 
+export interface MfaActivateResponse {
+  recovery_codes: string[];
+}
+
 export function isMfaChallenge(r: LoginResponse): r is MfaChallengeResponse {
   return (r as MfaChallengeResponse).mfa_required === true;
 }

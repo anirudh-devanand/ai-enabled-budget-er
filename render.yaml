@@ -1,0 +1,33 @@
+# Render Blueprint — API + managed Postgres
+# https://render.com/docs/blueprint-spec
+# Connect this GitHub repo in Render Dashboard → New → Blueprint
+
+databases:
+  - name: ledger-db
+    plan: free
+    databaseName: ledger
+    user: ledger
+
+services:
+  - type: web
+    name: ledger-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /healthz
+    envVars:
+      - key: LEDGER_ENV
+        value: production
+      - key: LEDGER_DATABASE_URL
+        fromDatabase:
+          name: ledger-db
+          property: connectionString
+      - key: LEDGER_JWT_SECRET
+        generateValue: true
+      - key: LEDGER_DATA_ENCRYPTION_KEY
+        sync: false
+      - key: LEDGER_OPS_TOKEN
+        generateValue: true
+      - key: LEDGER_CORS_ORIGINS
+        sync: false

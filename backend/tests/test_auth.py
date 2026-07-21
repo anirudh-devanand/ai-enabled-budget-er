@@ -108,7 +108,9 @@ async def test_mfa_enroll_activate_and_login_flow(client, register_payload):
     assert resp.status_code == 400
     code = pyotp.TOTP(secret).now()
     resp = await client.post("/v1/auth/mfa/activate", json={"code": code}, headers=auth)
-    assert resp.status_code == 204
+    assert resp.status_code == 200
+    recovery = resp.json()["recovery_codes"]
+    assert len(recovery) == 10
 
     # Login now returns a challenge instead of tokens.
     resp = await client.post(
@@ -128,3 +130,25 @@ async def test_mfa_enroll_activate_and_login_flow(client, register_payload):
     )
     assert resp.status_code == 200
     assert "access_token" in resp.json()
+
+    # Recovery code also works once, then is consumed.
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    challenge = resp.json()["challenge_token"]
+    resp = await client.post(
+        "/v1/auth/mfa/verify",
+        json={"challenge_token": challenge, "code": recovery[0]},
+    )
+    assert resp.status_code == 200
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    challenge = resp.json()["challenge_token"]
+    resp = await client.post(
+        "/v1/auth/mfa/verify",
+        json={"challenge_token": challenge, "code": recovery[0]},
+    )
+    assert resp.status_code == 401
