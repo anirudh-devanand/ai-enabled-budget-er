@@ -65,13 +65,18 @@ textarea {
 
 /* ??? Auth ??? */
 .auth {
+  /* Viewport centers the pair; row height is content-driven (form card). */
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
   max-width: 1100px;
+  width: 100%;
   margin: 0 auto;
   gap: 0;
   align-items: stretch;
+  align-content: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .auth-brand {
@@ -84,6 +89,8 @@ textarea {
   position: relative;
   overflow: hidden;
   border-radius: 0;
+  height: auto;
+  min-height: 0;
 }
 
 .auth-glow {
@@ -134,17 +141,19 @@ textarea {
 @media (min-width: 901px) {
   .auth {
     padding: 48px 24px;
-    /* Stretch both columns so brand panel matches taller SSO forms */
+    /* Equal column height from the form card; pair centered in viewport */
     align-items: stretch;
+    align-content: center;
   }
   .auth-brand {
     border-radius: 24px 0 0 24px;
-    min-height: 560px;
     max-width: 420px;
     width: 100%;
     height: auto;
+    min-height: 0;
     justify-self: end;
     align-self: stretch;
+    overflow: hidden;
   }
   .auth-panel {
     justify-self: start;
@@ -153,13 +162,17 @@ textarea {
     padding: 0;
     display: flex;
     align-items: stretch;
+    height: auto;
+    min-height: 0;
   }
   .auth-card {
     border-radius: 0 24px 24px 0;
     border-left: none;
-    min-height: 560px;
-    height: 100%;
-    flex: 1;
+    /* Content defines shell height; brand stretches to match */
+    min-height: 0;
+    height: auto;
+    width: 100%;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -868,10 +881,11 @@ button:not(.btn):not(.primary):not(.account-card):not(.cat-icon):not(.sso-btn):n
   max-width: 420px;
   box-shadow: var(--shadow);
 }
+/* Keep viewport centering without place-items (that sized columns independently). */
 main.auth {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  align-content: center;
+  justify-content: center;
   padding: 24px;
 }
 button.primary {
