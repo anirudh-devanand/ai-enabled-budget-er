@@ -18,6 +18,11 @@ const display = Newsreader({
 export const metadata: Metadata = {
   title: "Woney — Money, made clear",
   description: "Canadian personal finance with clear categorization and calm planning.",
+  icons: {
+    icon: [{ url: "/brand/woney-icon.png", type: "image/png" }],
+    apple: [{ url: "/brand/woney-icon.png", type: "image/png" }],
+    shortcut: ["/brand/woney-icon.png"],
+  },
 };
 
 const themeBoot = `

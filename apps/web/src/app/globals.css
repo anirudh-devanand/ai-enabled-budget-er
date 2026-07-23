@@ -1054,7 +1054,13 @@ input {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.bank-logo img {
+  display: block;
 }
 
 .bank-row {

@@ -57,79 +57,81 @@ export default function LoginPage() {
 
   return (
     <main className="auth">
-      <AuthBrand
-        headline="Money that feels calm."
-        lede="Clear categories, live Canadian bank sync, and a planner that never invents the math."
-      />
-      <section className="auth-panel">
-        <div className="auth-card">
-          <h1>{challengeToken ? "Confirm it’s you" : "Welcome back"}</h1>
-          <p className="sub">
-            {challengeToken
-              ? "Enter the code from your authenticator app"
-              : "Sign in to your Woney account"}
-          </p>
-          {challengeToken ? (
-            <form onSubmit={submitMfa}>
-              <div className="field">
-                <label htmlFor="code">Authentication code</label>
-                <input
-                  id="code"
-                  name="one-time-code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <button className="btn btn-primary btn-block" disabled={busy}>
-                {busy ? "Verifying…" : "Verify"}
-              </button>
-            </form>
-          ) : (
-            <>
-              <SsoButtons providers={providers} />
-              <form onSubmit={submitLogin}>
+      <div className="auth-shell">
+        <AuthBrand
+          headline="Money that feels calm."
+          lede="Clear categories, live Canadian bank sync, and a planner that never invents the math."
+        />
+        <section className="auth-panel">
+          <div className="auth-card">
+            <h1>{challengeToken ? "Confirm it’s you" : "Welcome back"}</h1>
+            <p className="sub">
+              {challengeToken
+                ? "Enter the code from your authenticator app"
+                : "Sign in to your Woney account"}
+            </p>
+            {challengeToken ? (
+              <form onSubmit={submitMfa}>
                 <div className="field">
-                  <label htmlFor="email">Email</label>
+                  <label htmlFor="code">Authentication code</label>
                   <input
-                    id="email"
-                    name="username"
-                    type="email"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="code"
+                    name="one-time-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
                     required
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="password">Password</label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    autoFocus
                   />
                 </div>
                 <button className="btn btn-primary btn-block" disabled={busy}>
-                  {busy ? "Signing in…" : "Sign in"}
+                  {busy ? "Verifying…" : "Verify"}
                 </button>
               </form>
-            </>
-          )}
-          {error && <p className="error">{error}</p>}
-          <p className="alt">
-            New here? <Link href="/register">Create an account</Link>
-          </p>
-        </div>
-      </section>
+            ) : (
+              <>
+                <SsoButtons providers={providers} />
+                <form onSubmit={submitLogin}>
+                  <div className="field">
+                    <label htmlFor="email">Email</label>
+                    <input
+                      id="email"
+                      name="username"
+                      type="email"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="password">Password</label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <button className="btn btn-primary btn-block" disabled={busy}>
+                    {busy ? "Signing in…" : "Sign in"}
+                  </button>
+                </form>
+              </>
+            )}
+            {error && <p className="error">{error}</p>}
+            <p className="alt">
+              New here? <Link href="/register">Create an account</Link>
+            </p>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
