@@ -1,4 +1,5 @@
 import type {
+  AccountDetailResponse,
   AccountResponse,
   BudgetDetailResponse,
   BudgetResponse,
@@ -14,9 +15,11 @@ import type {
   MfaActivateResponse,
   NamedAmount,
   NetWorthResponse,
+  OAuthProvider,
   PlanResponse,
   TokenPair,
   TransactionCorrectionResponse,
+  TransactionFilters,
   TransactionListResponse,
   UserResponse,
 } from "./types";
@@ -177,6 +180,28 @@ export class LedgerClient {
     return this.request<UserResponse>("GET", "/v1/users/me", undefined, { auth: true });
   }
 
+  updateMe(displayName: string) {
+    return this.request<UserResponse>(
+      "PATCH",
+      "/v1/users/me",
+      { display_name: displayName },
+      { auth: true },
+    );
+  }
+
+  listOAuthProviders() {
+    return this.request<{ providers: OAuthProvider[] }>("GET", "/v1/auth/oauth/providers");
+  }
+
+  async loginWithGoogleCode(code: string, redirectUri?: string) {
+    const result = await this.request<LoginResponse>("POST", "/v1/auth/oauth/google/callback", {
+      code,
+      redirect_uri: redirectUri,
+    });
+    if ("access_token" in result) this.storage.setTokens(result);
+    return result;
+  }
+
   // --- households ---
 
   listHouseholds() {
@@ -222,20 +247,56 @@ export class LedgerClient {
     );
   }
 
-  listAccounts(householdId: string) {
+  listAccounts(householdId: string, includeHidden = false) {
+    const hidden = includeHidden ? "&include_hidden=true" : "";
     return this.request<AccountResponse[]>(
       "GET",
-      `/v1/connections/accounts?household_id=${householdId}`,
+      `/v1/connections/accounts?household_id=${householdId}${hidden}`,
       undefined,
       { auth: true },
     );
   }
 
-  listTransactions(householdId: string, limit = 50, offset = 0, needsReview?: boolean) {
-    const review = needsReview === undefined ? "" : `&needs_review=${needsReview}`;
+  getAccount(accountId: string) {
+    return this.request<AccountDetailResponse>(
+      "GET",
+      `/v1/connections/accounts/${accountId}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  updateAccount(
+    accountId: string,
+    body: { nickname?: string | null; notes?: string | null; hidden?: boolean },
+  ) {
+    return this.request<AccountResponse>(
+      "PATCH",
+      `/v1/connections/accounts/${accountId}`,
+      body,
+      { auth: true },
+    );
+  }
+
+  listTransactions(householdId: string, filters: TransactionFilters | number = 50, offset = 0, needsReview?: boolean) {
+    const f: TransactionFilters =
+      typeof filters === "number"
+        ? { limit: filters, offset, needsReview }
+        : filters;
+    const params = new URLSearchParams({ household_id: householdId });
+    params.set("limit", String(f.limit ?? 50));
+    params.set("offset", String(f.offset ?? 0));
+    if (f.needsReview !== undefined) params.set("needs_review", String(f.needsReview));
+    if (f.accountId) params.set("account_id", f.accountId);
+    if (f.categoryId) params.set("category_id", f.categoryId);
+    if (f.q) params.set("q", f.q);
+    if (f.dateFrom) params.set("date_from", f.dateFrom);
+    if (f.dateTo) params.set("date_to", f.dateTo);
+    if (f.minAmount) params.set("min_amount", f.minAmount);
+    if (f.maxAmount) params.set("max_amount", f.maxAmount);
     return this.request<TransactionListResponse>(
       "GET",
-      `/v1/connections/transactions?household_id=${householdId}&limit=${limit}&offset=${offset}${review}`,
+      `/v1/connections/transactions?${params.toString()}`,
       undefined,
       { auth: true },
     );
@@ -243,8 +304,31 @@ export class LedgerClient {
 
   // --- categories & corrections ---
 
-  listCategories() {
-    return this.request<CategoryResponse[]>("GET", "/v1/categories/", undefined, { auth: true });
+  listCategories(householdId?: string) {
+    const path = householdId
+      ? `/v1/categories/?household_id=${householdId}`
+      : `/v1/categories/`;
+    return this.request<CategoryResponse[]>("GET", path, undefined, { auth: true });
+  }
+
+  listCategoryIcons() {
+    return this.request<{ icons: string[]; colors: string[] }>("GET", "/v1/categories/icons", undefined, {
+      auth: true,
+    });
+  }
+
+  updateCategoryPreference(
+    categoryId: string,
+    householdId: string,
+    iconKey: string,
+    color: string,
+  ) {
+    return this.request<CategoryResponse>(
+      "PUT",
+      `/v1/categories/${categoryId}/preference?household_id=${householdId}`,
+      { icon_key: iconKey, color },
+      { auth: true },
+    );
   }
 
   correctTransaction(transactionId: string, categoryId: string, merchantName?: string) {

@@ -59,7 +59,7 @@ async def register(body: RegisterRequest, db: DbDep) -> User:
 async def login(body: LoginRequest, db: DbDep, request: Request):
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
-    if user is None or not verify_password(body.password, user.password_hash):
+    if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if user.mfa_enabled:
         return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
@@ -130,3 +130,71 @@ async def regenerate_recovery_codes(user: CurrentUser, db: DbDep) -> MfaRecovery
     user.mfa_recovery_hashes = hashes
     await db.commit()
     return MfaRecoveryCodesResponse(recovery_codes=codes)
+
+
+@router.get("/oauth/providers")
+async def oauth_providers():
+    from app.auth.oauth import configured_providers
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    return {
+        "providers": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "enabled": p.enabled,
+                "auth_url": p.auth_url,
+            }
+            for p in configured_providers(settings, settings.oauth_redirect_uri)
+        ]
+    }
+
+
+@router.post("/oauth/google/callback", response_model=TokenPair | MfaChallengeResponse)
+async def oauth_google_callback(
+    body: dict,
+    db: DbDep,
+    request: Request,
+):
+    """Exchange Google authorization code for a Woney session."""
+    from app.auth.oauth import exchange_google_code
+    from app.core.config import get_settings
+
+    code = body.get("code")
+    if not code or not isinstance(code, str):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing code")
+    settings = get_settings()
+    redirect_uri = body.get("redirect_uri") or settings.oauth_redirect_uri
+    try:
+        profile = await exchange_google_code(settings, code, redirect_uri)
+    except Exception as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Google OAuth failed: {exc}") from exc
+
+    email = (profile.get("email") or "").lower()
+    subject = profile.get("sub")
+    if not email or not subject:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google profile incomplete")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email,
+            password_hash=None,
+            display_name=profile.get("name") or email.split("@")[0],
+            oauth_provider="google",
+            oauth_subject=subject,
+        )
+        db.add(user)
+        await db.flush()
+        await create_personal_household(db, user)
+    else:
+        user.oauth_provider = user.oauth_provider or "google"
+        user.oauth_subject = user.oauth_subject or subject
+    await db.commit()
+    await db.refresh(user)
+    if user.mfa_enabled:
+        return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
+    return await service.issue_token_pair(db, user.id, request.headers.get("user-agent"))
+

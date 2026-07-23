@@ -7,15 +7,19 @@ const WEB_HINT =
 export function ConnectScreen() {
   return (
     <View style={styles.root}>
-      <Text style={styles.h1}>Connect a bank</Text>
-      <Text style={styles.body}>
-        Flinks Connect runs in a secure browser iframe. Open the web app on this device to link
-        Neo, EQ, or your bank, then return here — accounts and transactions sync to the same
-        household.
+      <Text style={styles.h1}>Link a bank</Text>
+      <Text style={styles.lede}>
+        Secure connection through Flinks — Woney never sees your bank password.
       </Text>
-      <Pressable style={styles.button} onPress={() => Linking.openURL(WEB_HINT)}>
-        <Text style={styles.buttonText}>Open web connect</Text>
-      </Pressable>
+      <View style={styles.card}>
+        <Text style={styles.body}>
+          Open the web connect flow on this device to link your bank. Accounts and transactions sync
+          to the same household, then show up here.
+        </Text>
+        <Pressable style={styles.button} onPress={() => Linking.openURL(WEB_HINT)}>
+          <Text style={styles.buttonText}>Open web connect</Text>
+        </Pressable>
+      </View>
       <Text style={styles.muted}>API: {process.env.EXPO_PUBLIC_API_URL ?? "not set"}</Text>
     </View>
   );
@@ -23,14 +27,22 @@ export function ConnectScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  h1: { color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  body: { color: colors.muted, lineHeight: 22, marginBottom: 20 },
+  h1: { color: colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  lede: { color: colors.muted, marginBottom: 14, marginTop: 2 },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+  },
+  body: { color: colors.text, lineHeight: 22, marginBottom: 18 },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingVertical: 14,
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: "#1a1814", fontWeight: "700" },
   muted: { color: colors.muted, marginTop: 20, fontSize: 12 },
 });

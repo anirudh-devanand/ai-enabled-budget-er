@@ -75,36 +75,50 @@ export function GoalsScreen() {
       refreshControl={<RefreshControl refreshing={busy} onRefresh={load} tintColor={colors.accent} />}
     >
       <Text style={styles.h1}>Goals</Text>
-      <TextInput
-        style={styles.input}
-        value={name}
-        onChangeText={setName}
-        placeholder="Goal name"
-        placeholderTextColor={colors.muted}
-      />
-      <TextInput
-        style={styles.input}
-        value={target}
-        onChangeText={setTarget}
-        keyboardType="decimal-pad"
-        placeholder="Target amount"
-        placeholderTextColor={colors.muted}
-      />
-      <Pressable style={styles.button} onPress={create} disabled={busy || !householdId}>
-        <Text style={styles.buttonText}>Add goal</Text>
-      </Pressable>
+      <Text style={styles.lede}>Set a target. Plan from real cash flow.</Text>
 
-      {goals.map((g) => (
-        <View style={styles.card} key={g.id}>
-          <Text style={styles.title}>{g.name}</Text>
-          <Text style={styles.muted}>
-            {money(g.current_amount)} / {money(g.target_amount)} · {g.status}
-          </Text>
-          <Pressable style={styles.secondary} onPress={() => build(g.id)}>
-            <Text style={styles.buttonText}>Build plan</Text>
-          </Pressable>
-        </View>
-      ))}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>New goal</Text>
+        <TextInput
+          style={styles.input}
+          value={name}
+          onChangeText={setName}
+          placeholder="Goal name"
+          placeholderTextColor={colors.muted}
+        />
+        <TextInput
+          style={styles.input}
+          value={target}
+          onChangeText={setTarget}
+          keyboardType="decimal-pad"
+          placeholder="Target amount"
+          placeholderTextColor={colors.muted}
+        />
+        <Pressable style={styles.button} onPress={create} disabled={busy || !householdId}>
+          <Text style={styles.buttonText}>Add goal</Text>
+        </Pressable>
+      </View>
+
+      {goals.map((g) => {
+        const pct = Math.min(
+          100,
+          (Number(g.current_amount) / Math.max(Number(g.target_amount), 1)) * 100,
+        );
+        return (
+          <View style={styles.card} key={g.id}>
+            <Text style={styles.title}>{g.name}</Text>
+            <Text style={styles.muted}>
+              {money(g.current_amount)} / {money(g.target_amount)}
+            </Text>
+            <View style={styles.barTrack}>
+              <View style={[styles.barFill, { width: `${pct}%` }]} />
+            </View>
+            <Pressable style={styles.secondary} onPress={() => build(g.id)}>
+              <Text style={styles.secondaryText}>Build plan</Text>
+            </Pressable>
+          </View>
+        );
+      })}
 
       {plan && (
         <View style={styles.card}>
@@ -129,42 +143,54 @@ export function GoalsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 40 },
-  h1: { color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  input: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    color: colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-  },
+  h1: { color: colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  lede: { color: colors.muted, marginBottom: 14, marginTop: 2 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  cardTitle: { color: colors.muted, fontWeight: "600", marginBottom: 10, fontSize: 13 },
+  input: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
+    color: colors.text,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 10,
   },
-  title: { color: colors.text, fontWeight: "600" },
+  title: { color: colors.text, fontWeight: "700", fontSize: 16 },
   muted: { color: colors.muted, marginTop: 4, fontSize: 13 },
   item: { color: colors.text, marginTop: 6, fontSize: 13 },
+  barTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.border,
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  barFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 999 },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 14,
+    marginTop: 4,
   },
   secondary: {
-    backgroundColor: "#2a3548",
-    borderRadius: 8,
-    paddingVertical: 10,
+    marginTop: 14,
+    borderRadius: 999,
+    paddingVertical: 12,
     alignItems: "center",
-    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: "#1a1814", fontWeight: "700" },
+  secondaryText: { color: colors.text, fontWeight: "600" },
   error: { color: colors.danger, marginTop: 12 },
 });

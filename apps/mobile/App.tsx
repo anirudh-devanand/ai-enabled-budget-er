@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -11,7 +13,8 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { ApiError, isMfaChallenge, type UserResponse } from "@ledger/api-client";
 import { api } from "./src/api";
-import { colors } from "./src/theme";
+import { PasswordStrength } from "./src/components/ui";
+import { colors, passwordScore } from "./src/theme";
 import { AssistantScreen } from "./src/screens/AssistantScreen";
 import { BudgetsScreen } from "./src/screens/BudgetsScreen";
 import { ConnectScreen } from "./src/screens/ConnectScreen";
@@ -23,10 +26,10 @@ type Tab = "home" | "txns" | "budgets" | "goals" | "assistant" | "connect";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "home", label: "Home" },
-  { id: "txns", label: "Txns" },
+  { id: "txns", label: "Activity" },
   { id: "budgets", label: "Budget" },
   { id: "goals", label: "Goals" },
-  { id: "assistant", label: "AI" },
+  { id: "assistant", label: "Ask" },
   { id: "connect", label: "Bank" },
 ];
 
@@ -41,6 +44,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const strength = useMemo(() => passwordScore(password), [password]);
 
   async function login() {
     setError(null);
@@ -61,6 +65,10 @@ export default function App() {
 
   async function register() {
     setError(null);
+    if (strength.score < 3) {
+      setError("Choose a stronger password before continuing.");
+      return;
+    }
     setBusy(true);
     try {
       await api.register(email, password, displayName || email.split("@")[0]);
@@ -94,93 +102,133 @@ export default function App() {
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.root}>
+      <View style={styles.authRoot}>
         <StatusBar style="light" />
-        <View style={styles.card}>
-          <Text style={styles.title}>Ledger</Text>
-          {challengeToken ? (
-            <>
-              <Text style={styles.sub}>Authenticator or recovery code</Text>
-              <TextInput
-                style={styles.input}
-                value={code}
-                onChangeText={setCode}
-                autoCapitalize="characters"
-                placeholder="123456 or ABCD-EF01"
-                placeholderTextColor={colors.muted}
-              />
-              <Pressable style={styles.button} onPress={verify} disabled={busy}>
-                {busy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Verify</Text>
-                )}
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Text style={styles.sub}>{mode === "login" ? "Sign in" : "Create account"}</Text>
-              {mode === "register" && (
-                <TextInput
-                  style={styles.input}
-                  value={displayName}
-                  onChangeText={setDisplayName}
-                  placeholder="Display name"
-                  placeholderTextColor={colors.muted}
-                />
-              )}
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder="Email"
-                placeholderTextColor={colors.muted}
-              />
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="Password (10+ chars)"
-                placeholderTextColor={colors.muted}
-              />
-              <Pressable
-                style={styles.button}
-                onPress={mode === "login" ? login : register}
-                disabled={busy}
-              >
-                {busy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {mode === "login" ? "Sign in" : "Register"}
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={styles.authInner}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <View style={styles.authHeader}>
+              <Text style={styles.brandMark}>Woney</Text>
+              <Text style={styles.tagline}>Money, made clear.</Text>
+            </View>
+
+            <View style={styles.authCard}>
+              <View style={styles.goldEdge} />
+              {challengeToken ? (
+                <>
+                  <Text style={styles.authTitle}>Confirm it’s you</Text>
+                  <Text style={styles.authSub}>Authenticator or recovery code</Text>
+                  <TextInput
+                    style={styles.authInput}
+                    value={code}
+                    onChangeText={setCode}
+                    autoCapitalize="characters"
+                    autoComplete="one-time-code"
+                    textContentType="oneTimeCode"
+                    placeholder="123456 or ABCD-EF01"
+                    placeholderTextColor={colors.authMuted}
+                  />
+                  <Pressable style={styles.goldButton} onPress={verify} disabled={busy}>
+                    {busy ? (
+                      <ActivityIndicator color="#1a1814" />
+                    ) : (
+                      <Text style={styles.goldButtonText}>Verify</Text>
+                    )}
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.authTitle}>
+                    {mode === "login" ? "Welcome back" : "Create account"}
                   </Text>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={() => setMode(mode === "login" ? "register" : "login")}
-                style={{ marginTop: 14 }}
-              >
-                <Text style={styles.link}>
-                  {mode === "login" ? "Need an account? Register" : "Have an account? Sign in"}
-                </Text>
-              </Pressable>
-            </>
-          )}
-          {error && <Text style={styles.error}>{error}</Text>}
-        </View>
-      </SafeAreaView>
+                  <Text style={styles.authSub}>
+                    {mode === "login" ? "Sign in to Woney" : "Takes about a minute"}
+                  </Text>
+                  {mode === "register" && (
+                    <TextInput
+                      style={styles.authInput}
+                      value={displayName}
+                      onChangeText={setDisplayName}
+                      autoComplete="name"
+                      textContentType="name"
+                      placeholder="Full name"
+                      placeholderTextColor={colors.authMuted}
+                    />
+                  )}
+                  <TextInput
+                    style={styles.authInput}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    autoComplete="username"
+                    textContentType="username"
+                    placeholder="Email"
+                    placeholderTextColor={colors.authMuted}
+                  />
+                  <TextInput
+                    style={styles.authInput}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoComplete={mode === "login" ? "password" : "new-password"}
+                    textContentType={mode === "login" ? "password" : "newPassword"}
+                    placeholder={mode === "login" ? "Password" : "Password (10+ chars)"}
+                    placeholderTextColor={colors.authMuted}
+                  />
+                  {mode === "register" && <PasswordStrength password={password} />}
+                  <Pressable
+                    style={[
+                      styles.goldButton,
+                      mode === "register" && strength.score < 3 && styles.buttonDisabled,
+                    ]}
+                    onPress={mode === "login" ? login : register}
+                    disabled={busy || (mode === "register" && strength.score < 3)}
+                  >
+                    {busy ? (
+                      <ActivityIndicator color="#1a1814" />
+                    ) : (
+                      <Text style={styles.goldButtonText}>
+                        {mode === "login" ? "Sign in" : "Create account"}
+                      </Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setMode(mode === "login" ? "register" : "login");
+                      setError(null);
+                    }}
+                    style={{ marginTop: 18 }}
+                  >
+                    <Text style={styles.authLink}>
+                      {mode === "login"
+                        ? "New here? Create an account"
+                        : "Have an account? Sign in"}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+              {error && <Text style={styles.authError}>{error}</Text>}
+            </View>
+
+            <Text style={styles.authFoot}>Trusted sync · Honest numbers · Built for Canada</Text>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.app}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={styles.topBar}>
-        <Text style={styles.topTitle}>Hi, {user.display_name}</Text>
-        <Pressable onPress={logout}>
+        <Text style={styles.topBrand}>Woney</Text>
+        <Pressable onPress={logout} hitSlop={8}>
           <Text style={styles.link}>Sign out</Text>
         </Pressable>
       </View>
@@ -204,57 +252,133 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: 24 },
-  app: { flex: 1, backgroundColor: colors.bg },
-  body: { flex: 1 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 28,
+  authRoot: {
+    flex: 1,
+    backgroundColor: colors.authBg,
   },
-  title: { color: colors.text, fontSize: 24, fontWeight: "700" },
-  sub: { color: colors.muted, marginTop: 4, marginBottom: 20 },
-  input: {
-    backgroundColor: colors.bg,
+  glowTop: {
+    position: "absolute",
+    top: -80,
+    left: -40,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(201, 168, 74, 0.18)",
+  },
+  glowBottom: {
+    position: "absolute",
+    bottom: -60,
+    right: -50,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(138, 107, 40, 0.22)",
+  },
+  authInner: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+  },
+  authHeader: { marginBottom: 28, paddingHorizontal: 4 },
+  brandMark: {
+    fontSize: 40,
+    fontWeight: "700",
+    letterSpacing: -1,
+    color: colors.goldShine,
+  },
+  tagline: {
+    marginTop: 8,
+    fontSize: 17,
+    color: colors.authMuted,
+    letterSpacing: -0.2,
+  },
+  authCard: {
+    backgroundColor: colors.authCard,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    color: colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: colors.authBorder,
+    padding: 24,
+    overflow: "hidden",
+  },
+  goldEdge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: colors.goldBright,
+  },
+  authTitle: {
+    color: colors.authText,
+    fontSize: 24,
+    fontWeight: "700",
+    letterSpacing: -0.4,
+  },
+  authSub: { color: colors.authMuted, marginTop: 6, marginBottom: 22 },
+  authInput: {
+    backgroundColor: "#141210",
+    borderWidth: 1,
+    borderColor: colors.authBorder,
+    borderRadius: 14,
+    color: colors.authText,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     marginBottom: 12,
   },
-  button: {
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
+  goldButton: {
+    backgroundColor: colors.goldBright,
+    borderRadius: 999,
+    paddingVertical: 15,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 10,
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  error: { color: colors.danger, marginTop: 14 },
-  link: { color: colors.accent, fontWeight: "500" },
+  goldButtonText: { color: "#1a1814", fontWeight: "700", fontSize: 16 },
+  buttonDisabled: { opacity: 0.45 },
+  authLink: { color: colors.goldShine, fontWeight: "600", textAlign: "center" },
+  authError: {
+    color: "#ffb4b4",
+    marginTop: 14,
+    backgroundColor: "rgba(194,59,59,0.18)",
+    padding: 10,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  authFoot: {
+    marginTop: 28,
+    textAlign: "center",
+    color: colors.authMuted,
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  app: { flex: 1, backgroundColor: colors.bg },
+  body: { flex: 1 },
+  link: { color: colors.accent, fontWeight: "600" },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.92)",
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  topTitle: { color: colors.text, fontWeight: "600" },
+  topBrand: {
+    color: colors.text,
+    fontWeight: "700",
+    fontSize: 18,
+    letterSpacing: -0.3,
+  },
   tabs: {
     flexDirection: "row",
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingVertical: 8,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: colors.tabBar,
   },
   tab: { flex: 1, alignItems: "center", paddingVertical: 6 },
-  tabText: { color: colors.muted, fontSize: 12, fontWeight: "500" },
+  tabText: { color: colors.muted, fontSize: 11, fontWeight: "600" },
   tabActive: { color: colors.accent },
 });

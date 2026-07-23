@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     embedding_match_threshold: float = 0.72
     llm_enrichment_min_confidence: float = 0.7
 
+    # SSO / OAuth (optional — buttons show as available when set).
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    apple_oauth_client_id: str | None = None
+    apple_oauth_team_id: str | None = None
+    microsoft_oauth_client_id: str | None = None
+    microsoft_oauth_client_secret: str | None = None
+    oauth_redirect_uri: str = "http://localhost:3000/login/oauth/callback"
+
     @field_validator("env")
     @classmethod
     def normalize_env(cls, value: str) -> str:

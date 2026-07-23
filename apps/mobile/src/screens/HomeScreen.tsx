@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import type { AccountResponse, HouseholdResponse, TransactionResponse } from "@ledger/api-client";
 import { api } from "../api";
+import { CategoryIcon } from "../components/ui";
 import { colors, money } from "../theme";
 
 type Props = {
@@ -67,48 +68,64 @@ export function HomeScreen({ onOpenConnect }: Props) {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={busy} onRefresh={load} tintColor={colors.accent} />}
     >
-      <Text style={styles.h1}>{household?.name ?? "Home"}</Text>
-      <View style={styles.card}>
-        <Text style={styles.label}>Total balance</Text>
-        <Text style={styles.big}>{money(net, accounts[0]?.currency ?? "CAD")}</Text>
-        <Text style={styles.muted}>
-          {accounts.length} account{accounts.length === 1 ? "" : "s"}
+      <Text style={styles.h1}>Hello</Text>
+      <Text style={styles.lede}>{household?.name ?? "Your household"}</Text>
+
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>Total balance</Text>
+        <Text style={styles.heroAmount}>{money(net, accounts[0]?.currency ?? "CAD")}</Text>
+        <Text style={styles.heroMeta}>
+          {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
         </Text>
       </View>
 
       {accounts.length === 0 && (
         <Pressable style={styles.button} onPress={onOpenConnect}>
-          <Text style={styles.buttonText}>Connect a bank (web)</Text>
+          <Text style={styles.buttonText}>Link a bank</Text>
         </Pressable>
       )}
 
       {accounts.map((a) => (
         <View style={styles.card} key={a.id}>
-          <Text style={styles.title}>{a.name}</Text>
-          <Text style={styles.muted}>
-            {a.type}
-            {a.masked_number ? ` ****${a.masked_number}` : ""}
+          <Text style={styles.cardLabel}>{a.type}</Text>
+          <Text style={styles.title}>
+            {a.name}
+            {a.masked_number ? ` ····${a.masked_number}` : ""}
           </Text>
           <Text style={styles.amount}>{money(a.balance, a.currency)}</Text>
         </View>
       ))}
 
-      <Text style={styles.h2}>Recent</Text>
-      {txns.map((t) => (
-        <View style={styles.row} key={t.id}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{t.display_name}</Text>
-            <Text style={styles.muted}>
-              {t.date}
-              {t.category_name ? ` · ${t.category_name}` : ""}
-              {t.needs_review ? " · needs review" : ""}
-            </Text>
+      {txns.length > 0 && (
+        <>
+          <Text style={styles.h2}>Recent activity</Text>
+          <View style={styles.list}>
+            {txns.map((t) => (
+              <View style={styles.row} key={t.id}>
+                <CategoryIcon name={t.category_name} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {t.display_name}
+                  </Text>
+                  <Text style={styles.muted}>
+                    {t.date}
+                    {t.category_name ? ` · ${t.category_name}` : ""}
+                    {t.needs_review ? " · needs review" : ""}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.rowAmount,
+                    Number(t.amount) >= 0 && { color: colors.positive },
+                  ]}
+                >
+                  {money(t.amount, t.currency)}
+                </Text>
+              </View>
+            ))}
           </View>
-          <Text style={[styles.amount, Number(t.amount) < 0 && { color: colors.danger }]}>
-            {money(t.amount, t.currency)}
-          </Text>
-        </View>
-      ))}
+        </>
+      )}
       {error && <Text style={styles.error}>{error}</Text>}
     </ScrollView>
   );
@@ -118,39 +135,61 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg },
-  h1: { color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  h2: { color: colors.text, fontSize: 16, fontWeight: "600", marginTop: 18, marginBottom: 8 },
+  h1: { color: colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  lede: { color: colors.muted, marginBottom: 16, marginTop: 2 },
+  h2: { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 22, marginBottom: 10 },
+  hero: {
+    backgroundColor: colors.goldDeep,
+    borderRadius: 20,
+    padding: 22,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.goldBright,
+  },
+  heroLabel: { color: "rgba(245,241,232,0.82)", fontWeight: "600", fontSize: 13 },
+  heroAmount: {
+    color: "#f5f1e8",
+    fontSize: 32,
+    fontWeight: "700",
+    marginTop: 4,
+    letterSpacing: -0.6,
+  },
+  heroMeta: { color: "rgba(232,213,163,0.9)", marginTop: 8, fontSize: 13 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
     marginBottom: 10,
   },
-  label: { color: colors.muted, fontSize: 13 },
-  big: { color: colors.text, fontSize: 28, fontWeight: "700", marginTop: 4 },
+  cardLabel: { color: colors.muted, fontSize: 12, fontWeight: "600", marginBottom: 2 },
   title: { color: colors.text, fontWeight: "600" },
-  muted: { color: colors.muted, marginTop: 2, fontSize: 13 },
-  amount: { color: colors.text, fontWeight: "600", marginTop: 6 },
+  muted: { color: colors.muted, marginTop: 2, fontSize: 12 },
+  amount: { color: colors.text, fontWeight: "700", marginTop: 8, fontSize: 18 },
+  list: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
   row: {
     flexDirection: "row",
     gap: 12,
     alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-    marginBottom: 8,
+    padding: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
+  rowAmount: { color: colors.text, fontWeight: "700", fontVariant: ["tabular-nums"] },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingVertical: 14,
     alignItems: "center",
     marginBottom: 12,
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: "#1a1814", fontWeight: "700" },
   error: { color: colors.danger, marginTop: 12 },
 });

@@ -2,12 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { CategoryResponse, TransactionResponse } from "@ledger/api-client";
+import type {
+  AccountResponse,
+  CategoryResponse,
+  TransactionResponse,
+} from "@ledger/api-client";
+import { AppShell, CategoryIcon, FilterBar } from "@/components/ui";
+import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
-
-function formatMoney(amount: string, currency: string): string {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(Number(amount));
-}
+import { isUnauthorized } from "@/lib/errors";
+import { formatMoney } from "@/lib/ui";
 
 function CorrectionForm({
   transaction,
@@ -35,7 +39,7 @@ function CorrectionForm({
       );
       onDone(
         result.reapplied_count > 0
-          ? `Saved - also fixed ${result.reapplied_count} matching transaction${result.reapplied_count === 1 ? "" : "s"}`
+          ? `Saved — also fixed ${result.reapplied_count} matching transaction${result.reapplied_count === 1 ? "" : "s"}`
           : "Saved",
       );
     } finally {
@@ -44,7 +48,7 @@ function CorrectionForm({
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
       <input
         aria-label="Merchant name"
         value={merchant}
@@ -56,10 +60,10 @@ function CorrectionForm({
         value={categoryId}
         onChange={(e) => setCategoryId(e.target.value)}
         style={{
-          background: "var(--bg)",
+          background: "#fff",
           color: "var(--text)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
+          border: "1px solid var(--border-strong)",
+          borderRadius: 10,
           padding: "10px 12px",
         }}
       >
@@ -72,12 +76,7 @@ function CorrectionForm({
           </option>
         ))}
       </select>
-      <button
-        className="primary"
-        style={{ width: "auto", marginTop: 0, padding: "10px 18px" }}
-        onClick={save}
-        disabled={busy || !categoryId}
-      >
+      <button type="button" className="btn btn-primary" onClick={save} disabled={busy || !categoryId}>
         Save
       </button>
     </div>
@@ -89,116 +88,168 @@ export default function TransactionsPage() {
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [reviewOnly, setReviewOnly] = useState(false);
+  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [reviewOnly, setReviewOnly] = useState(false);
 
   const load = useCallback(
-    async (hid: string, review: boolean) => {
-      const result = await api.listTransactions(hid, 100, 0, review ? true : undefined);
+    async (hid: string) => {
+      const result = await api.listTransactions(hid, {
+        limit: 100,
+        q: q || undefined,
+        accountId: accountId || undefined,
+        categoryId: categoryId || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        needsReview: reviewOnly ? true : undefined,
+      });
       setTransactions(result.items);
     },
-    [],
+    [q, accountId, categoryId, dateFrom, dateTo, reviewOnly],
   );
 
   useEffect(() => {
     (async () => {
       try {
-        const [households, cats] = await Promise.all([api.listHouseholds(), api.listCategories()]);
+        const households = await api.listHouseholds();
         const hid = households[0]?.id ?? null;
         setHouseholdId(hid);
+        if (!hid) return;
+        const [cats, accs] = await Promise.all([
+          api.listCategories(hid),
+          api.listAccounts(hid),
+        ]);
         setCategories(cats);
-        if (hid) await load(hid, reviewOnly);
-      } catch {
-        router.replace("/login");
+        setAccounts(accs);
+        await load(hid);
+      } catch (err) {
+        if (isUnauthorized(err)) router.replace("/login");
       }
     })();
-  }, [router, load, reviewOnly]);
+  }, [router, load]);
 
-  const reviewCount = transactions.filter((t) => t.needs_review).length;
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
 
   return (
-    <div className="shell">
-      <header>
-        <h1>Transactions</h1>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setReviewOnly(!reviewOnly)}>
-            {reviewOnly ? "Show all" : "Needs review"}
-          </button>
-          <button onClick={() => router.push("/dashboard")}>Dashboard</button>
+    <AppShell householdId={householdId}>
+      <div className="page-header">
+        <div>
+          <h1>Activity</h1>
+          <p>Filter, review, and correct categories — Woney learns from every fix.</p>
         </div>
-      </header>
+      </div>
 
-      {toast && (
-        <p style={{ color: "#4fc37f", marginTop: 0 }}>{toast}</p>
-      )}
-      {!reviewOnly && reviewCount > 0 && (
-        <p style={{ color: "var(--muted)", marginTop: 0 }}>
-          {reviewCount} transaction{reviewCount === 1 ? "" : "s"} need a quick review - fixing one
-          teaches Ledger the merchant forever.
-        </p>
-      )}
-
-      <div className="tile" style={{ padding: 0 }}>
-        {transactions.map((t) => (
-          <div
-            key={t.id}
-            style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)" }}
+      <FilterBar>
+        <div>
+          <label htmlFor="q">Search</label>
+          <input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Merchant…" />
+        </div>
+        <div>
+          <label htmlFor="acc">Account</label>
+          <select id="acc" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">All accounts</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.display_name || a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="cat">Category</label>
+          <select id="cat" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="from">From</label>
+          <input id="from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="to">To</label>
+          <input id="to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", alignItems: "end" }}>
+          <button
+            type="button"
+            className={`btn ${reviewOnly ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => setReviewOnly(!reviewOnly)}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <span style={{ color: "var(--muted)", flexShrink: 0, width: 90 }}>{t.date}</span>
-              <span style={{ flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {t.display_name}
-                {t.category_name && <span className="badge" style={{ marginLeft: 10, marginTop: 0 }}>{t.category_name}</span>}
-                {t.needs_review && (
-                  <button
-                    onClick={() => setEditing(editing === t.id ? null : t.id)}
-                    style={{
-                      marginLeft: 10,
-                      background: "none",
-                      border: "1px solid var(--danger)",
-                      color: "var(--danger)",
-                      borderRadius: 999,
-                      padding: "2px 10px",
-                      fontSize: "0.75rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {editing === t.id ? "Cancel" : "Fix category"}
-                  </button>
-                )}
-              </span>
-              <span
-                style={{
-                  color: Number(t.amount) >= 0 ? "#4fc37f" : "var(--text)",
-                  flexShrink: 0,
-                }}
-              >
-                {formatMoney(t.amount, t.currency)}
-              </span>
-            </div>
-            {editing === t.id && (
-              <div style={{ marginTop: 10 }}>
-                <CorrectionForm
-                  transaction={t}
-                  categories={categories}
-                  onDone={async (message) => {
-                    setEditing(null);
-                    setToast(message);
-                    if (householdId) await load(householdId, reviewOnly);
-                    setTimeout(() => setToast(null), 4000);
-                  }}
-                />
+            {reviewOnly ? "Needs review ✓" : "Needs review"}
+          </button>
+        </div>
+      </FilterBar>
+
+      {toast && <div className="toast">{toast}</div>}
+
+      <div className="list-card">
+        {transactions.map((t) => {
+          const pref = t.category_id ? catMap[t.category_id] : undefined;
+          return (
+            <div key={t.id} style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="txn-row" style={{ borderBottom: "none" }}>
+                <CategoryIcon name={t.category_name} pref={pref} />
+                <div className="txn-meta">
+                  <div className="name">{t.display_name}</div>
+                  <div className="sub">
+                    {t.date}
+                    {t.category_name ? ` · ${t.category_name}` : ""}
+                    {t.needs_review ? " · needs review" : ""}
+                    <button
+                      type="button"
+                      onClick={() => setEditing(editing === t.id ? null : t.id)}
+                      style={{
+                        marginLeft: 8,
+                        background: "none",
+                        border: "none",
+                        color: "var(--accent)",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      {editing === t.id ? "Cancel" : "Edit type"}
+                    </button>
+                  </div>
+                </div>
+                <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
+                  {formatMoney(t.amount, t.currency)}
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+              {editing === t.id && (
+                <div style={{ padding: "0 16px 16px 74px" }}>
+                  <CorrectionForm
+                    transaction={t}
+                    categories={categories}
+                    onDone={async (message) => {
+                      setEditing(null);
+                      setToast(message);
+                      if (householdId) await load(householdId);
+                      setTimeout(() => setToast(null), 4000);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {transactions.length === 0 && (
-          <p style={{ padding: 20, color: "var(--muted)" }}>
-            {reviewOnly ? "Nothing needs review." : "No transactions yet - connect a bank first."}
+          <p style={{ padding: 24 }} className="muted">
+            No transactions match these filters.
           </p>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ConnectionCreateRequest(BaseModel):
     household_id: uuid.UUID
-    # loginId captured from the Flinks Connect widget REDIRECT event.
     login_id: str = Field(min_length=8, max_length=64)
 
 
@@ -23,18 +22,6 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
 
 
-class AccountResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    connection_id: uuid.UUID
-    name: str
-    type: str
-    currency: str
-    balance: Decimal
-    masked_number: str | None
-
-
 class TransactionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,7 +31,6 @@ class TransactionResponse(BaseModel):
     raw_description: str
     amount: Decimal
     currency: str
-    # Enrichment: what the UI should actually show.
     display_name: str
     merchant_name: str | None = None
     category_id: uuid.UUID | None = None
@@ -55,3 +41,30 @@ class TransactionResponse(BaseModel):
 class TransactionListResponse(BaseModel):
     items: list[TransactionResponse]
     total: int
+
+
+class AccountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    connection_id: uuid.UUID
+    name: str
+    type: str
+    currency: str
+    balance: Decimal
+    masked_number: str | None
+    nickname: str | None = None
+    notes: str | None = None
+    hidden: bool = False
+    display_name: str | None = None
+    institution_name: str | None = None
+
+
+class AccountUpdateRequest(BaseModel):
+    nickname: str | None = Field(default=None, max_length=120)
+    notes: str | None = Field(default=None, max_length=500)
+    hidden: bool | None = None
+
+
+class AccountDetailResponse(AccountResponse):
+    recent_transactions: list[TransactionResponse] = []

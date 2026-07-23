@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ApiError } from "@ledger/api-client";
+import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 
 const FLINKS_IFRAME_URL =
@@ -22,7 +23,6 @@ function ConnectInner() {
 
     async function onMessage(event: MessageEvent) {
       const data = event.data as { step?: string; loginId?: string };
-      // Flinks Connect fires REDIRECT with the loginId once the user finishes.
       if (data?.step !== "REDIRECT" || !data.loginId || submitted.current) return;
       submitted.current = true;
       setStatus("syncing");
@@ -42,22 +42,35 @@ function ConnectInner() {
   if (!householdId) {
     return (
       <main className="auth">
-        <div className="card">
-          <h1>Connect a bank</h1>
-          <p className="sub">Missing household - open this page from your dashboard.</p>
-        </div>
+        <section className="auth-panel" style={{ gridColumn: "1 / -1" }}>
+          <div className="auth-card">
+            <h1>Link a bank</h1>
+            <p className="sub">Open this from your dashboard so we know which household to connect.</p>
+            <button type="button" className="btn btn-primary btn-block" onClick={() => router.push("/dashboard")}>
+              Back to home
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
 
   return (
-    <div className="shell">
-      <header>
-        <h1>Connect your bank</h1>
-        <button onClick={() => router.push("/dashboard")}>Back</button>
-      </header>
+    <AppShell householdId={householdId}>
+      <div className="page-header">
+        <div>
+          <h1>Link a bank</h1>
+          <p>Secure connection through Flinks — Woney never sees your bank password.</p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard")}>
+            Cancel
+          </button>
+        </div>
+      </div>
+
       {status === "syncing" && (
-        <p>Connected. Pulling your accounts and transactions - this can take a minute...</p>
+        <div className="toast">Connected. Pulling accounts and transactions — this can take a minute…</div>
       )}
       {status === "error" && <p className="error">{error}</p>}
       {status === "widget" && (
@@ -68,12 +81,13 @@ function ConnectInner() {
             width: "100%",
             height: 760,
             border: "1px solid var(--border)",
-            borderRadius: 12,
+            borderRadius: 16,
             background: "#fff",
+            boxShadow: "var(--shadow)",
           }}
         />
       )}
-    </div>
+    </AppShell>
   );
 }
 

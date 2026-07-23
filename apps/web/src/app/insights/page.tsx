@@ -3,14 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { NamedAmount, NetWorthResponse } from "@ledger/api-client";
+import { AppShell, CategoryIcon } from "@/components/ui";
 import { api } from "@/lib/api";
-
-function money(amount: string, currency = "CAD") {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(Number(amount));
-}
+import { isUnauthorized } from "@/lib/errors";
+import { formatMoney } from "@/lib/ui";
 
 export default function InsightsPage() {
   const router = useRouter();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
   const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
   const [spending, setSpending] = useState<NamedAmount[]>([]);
 
@@ -18,7 +18,8 @@ export default function InsightsPage() {
     (async () => {
       try {
         const households = await api.listHouseholds();
-        const hid = households[0]?.id;
+        const hid = households[0]?.id ?? null;
+        setHouseholdId(hid);
         if (!hid) return;
         const [nw, cats] = await Promise.all([
           api.getNetWorth(hid),
@@ -26,8 +27,8 @@ export default function InsightsPage() {
         ]);
         setNetWorth(nw);
         setSpending(cats);
-      } catch {
-        router.replace("/login");
+      } catch (err) {
+        if (isUnauthorized(err)) router.replace("/login");
       }
     })();
   }, [router]);
@@ -35,51 +36,58 @@ export default function InsightsPage() {
   const max = Math.max(...spending.map((s) => Number(s.amount)), 1);
 
   return (
-    <div className="shell">
-      <header>
-        <h1>Insights</h1>
-        <button onClick={() => router.push("/dashboard")}>Dashboard</button>
-      </header>
-
-      <div className="grid">
-        <div className="tile">
-          <h2>Net worth</h2>
-          <p style={{ fontSize: "1.6rem", color: "var(--text)", marginTop: 8 }}>
-            {netWorth ? money(netWorth.total, netWorth.currency) : "—"}
-          </p>
+    <AppShell householdId={householdId}>
+      <div className="page-header">
+        <div>
+          <h1>Insights</h1>
+          <p>A calm view of where your money sits and where it goes.</p>
         </div>
       </div>
 
-      <h2 style={{ marginTop: 32, fontSize: "1.05rem" }}>Spending by category (30 days)</h2>
-      <div className="tile" style={{ marginTop: 12 }}>
+      <div className="hero-balance">
+        <div className="label">Net worth</div>
+        <div className="amount">
+          {netWorth ? formatMoney(netWorth.total, netWorth.currency) : "—"}
+        </div>
+        <div className="meta">All linked accounts · CAD</div>
+      </div>
+
+      <div className="section-title">Spending by category · 30 days</div>
+      <div className="list-card">
         {spending.length === 0 && (
-          <p style={{ color: "var(--muted)" }}>No categorized spending yet.</p>
+          <p style={{ padding: 24 }} className="muted">
+            No categorized spending yet — link a bank or wait for sync.
+          </p>
         )}
         {spending.map((s) => (
-          <div key={s.name} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span>{s.name}</span>
-              <span>{money(s.amount)}</span>
-            </div>
-            <div
-              style={{
-                height: 8,
-                borderRadius: 4,
-                background: "var(--border)",
-                overflow: "hidden",
-              }}
-            >
+          <div className="txn-row" key={s.name}>
+            <CategoryIcon name={s.name} />
+            <div className="txn-meta">
+              <div className="name">{s.name}</div>
               <div
                 style={{
-                  height: "100%",
-                  width: `${(Number(s.amount) / max) * 100}%`,
-                  background: "var(--accent)",
+                  marginTop: 8,
+                  height: 6,
+                  borderRadius: 999,
+                  background: "var(--border)",
+                  overflow: "hidden",
+                  maxWidth: 280,
                 }}
-              />
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${(Number(s.amount) / max) * 100}%`,
+                    background: "var(--accent)",
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
             </div>
+            <div className="txn-amount">{formatMoney(s.amount)}</div>
           </div>
         ))}
       </div>
-    </div>
+    </AppShell>
   );
 }

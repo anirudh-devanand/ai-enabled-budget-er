@@ -8,11 +8,11 @@ import type {
   TransactionResponse,
   UserResponse,
 } from "@ledger/api-client";
+import { AppShell, CategoryIcon } from "@/components/ui";
+import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
-
-function formatMoney(amount: string, currency: string): string {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(Number(amount));
-}
+import { isUnauthorized } from "@/lib/errors";
+import { formatMoney } from "@/lib/ui";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function DashboardPage() {
     if (first) {
       const [accs, txns] = await Promise.all([
         api.listAccounts(first.id),
-        api.listTransactions(first.id, 15),
+        api.listTransactions(first.id, 12),
       ]);
       setAccounts(accs);
       setTransactions(txns.items);
@@ -37,112 +37,92 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    load().catch(() => router.replace("/login"));
+    load().catch((err) => {
+      if (isUnauthorized(err)) router.replace("/login");
+    });
   }, [load, router]);
 
-  async function logout() {
-    await api.logout();
-    router.replace("/login");
+  if (!user) {
+    return (
+      <div className="app-main">
+        <WoneyLoader label="Loading your accounts…" />
+      </div>
+    );
   }
-
-  if (!user) return null;
 
   const netBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
 
   return (
-    <div className="shell">
-      <header>
-        <h1>Welcome back, {user.display_name}</h1>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => router.push("/transactions")}>Transactions</button>
-          <button onClick={() => router.push("/insights")}>Insights</button>
-          <button onClick={() => router.push("/budgets")}>Budgets</button>
-          <button onClick={() => router.push("/goals")}>Goals</button>
-          <button onClick={() => router.push("/assistant")}>Assistant</button>
-          {household && (
-            <button onClick={() => router.push(`/connect?household=${household.id}`)}>
-              Connect a bank
-            </button>
-          )}
-          <button onClick={logout}>Sign out</button>
+    <AppShell householdId={household?.id}>
+      <div className="page-header">
+        <div>
+          <h1>Hello, {user.display_name.split(" ")[0]}</h1>
+          <p>Here’s where your money stands today.</p>
         </div>
-      </header>
+      </div>
+
+      <div className="hero-balance">
+        <div className="label">Total balance</div>
+        <div className="amount">
+          {formatMoney(String(netBalance), accounts[0]?.currency ?? "CAD")}
+        </div>
+        <div className="meta">
+          {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
+        </div>
+      </div>
 
       <div className="grid">
-        <div className="tile">
-          <h2>Total balance</h2>
-          <p style={{ fontSize: "1.6rem", color: "var(--text)", marginTop: 6 }}>
-            {formatMoney(String(netBalance), accounts[0]?.currency ?? "CAD")}
-          </p>
-          <span className="badge">
-            {accounts.length} account{accounts.length === 1 ? "" : "s"} linked
-          </span>
-        </div>
         {accounts.map((a) => (
-          <div className="tile" key={a.id}>
-            <h2>{a.name}</h2>
-            <p>
+          <button
+            type="button"
+            className="account-card"
+            key={a.id}
+            onClick={() => router.push(`/accounts/${a.id}`)}
+          >
+            <p className="label">
+              {a.display_name || a.name}
+              {a.masked_number ? ` ····${a.masked_number}` : ""}
+            </p>
+            <p className="amount">{formatMoney(a.balance, a.currency)}</p>
+            <p className="meta">
               {a.type}
-              {a.masked_number ? ` ****${a.masked_number}` : ""}
+              {a.institution_name ? ` · ${a.institution_name}` : ""}
             </p>
-            <p style={{ fontSize: "1.2rem", color: "var(--text)", marginTop: 8 }}>
-              {formatMoney(a.balance, a.currency)}
-            </p>
-          </div>
+          </button>
         ))}
         {accounts.length === 0 && household && (
-          <div className="tile">
-            <h2>{household.name}</h2>
-            <p>Connect a bank to start syncing transactions.</p>
-            <span className="badge">No accounts linked yet</span>
+          <div className="account-card">
+            <p className="label">{household.name}</p>
+            <p className="meta" style={{ marginTop: 12 }}>
+              Link a bank in Account to see live balances.
+            </p>
           </div>
         )}
       </div>
 
       {transactions.length > 0 && (
         <>
-          <h2 style={{ marginTop: 36, fontSize: "1.05rem" }}>Recent transactions</h2>
-          <div className="tile" style={{ marginTop: 12, padding: 0 }}>
+          <div className="section-title">Recent activity</div>
+          <div className="list-card">
             {transactions.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  padding: "12px 20px",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <span style={{ color: "var(--muted)", flexShrink: 0 }}>{t.date}</span>
-                <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    flexGrow: 1,
-                  }}
-                >
-                  {t.display_name}
-                  {t.category_name && (
-                    <span className="badge" style={{ marginLeft: 10, marginTop: 0 }}>
-                      {t.category_name}
-                    </span>
-                  )}
-                </span>
-                <span
-                  style={{
-                    color: Number(t.amount) >= 0 ? "#4fc37f" : "var(--text)",
-                    flexShrink: 0,
-                  }}
-                >
+              <div className="txn-row" key={t.id}>
+                <CategoryIcon name={t.category_name} />
+                <div className="txn-meta">
+                  <div className="name">{t.display_name}</div>
+                  <div className="sub">
+                    {t.date}
+                    {t.category_name ? ` · ${t.category_name}` : ""}
+                    {t.needs_review ? " · needs review" : ""}
+                  </div>
+                </div>
+                <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
                   {formatMoney(t.amount, t.currency)}
-                </span>
+                </div>
               </div>
             ))}
           </div>
         </>
       )}
-    </div>
+    </AppShell>
   );
 }

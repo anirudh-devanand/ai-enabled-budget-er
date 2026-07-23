@@ -147,4 +147,6 @@ async def test_assistant_offline_chat(client, register_payload):
     )
     assert msg.status_code == 200, msg.text
     assert msg.json()["role"] == "assistant"
-    assert "Net worth" in msg.json()["content"]
+    content = msg.json()["content"]
+    assert "net worth" in content.lower() or "spending" in content.lower()
+    assert "{" not in content  # no raw JSON dump

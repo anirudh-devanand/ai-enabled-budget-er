@@ -1,28 +1,28 @@
 {
   "expo": {
-    "name": "Ledger",
-    "slug": "ledger",
+    "name": "Woney",
+    "slug": "woney",
     "version": "0.2.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0e1116"
+      "backgroundColor": "#141210"
     },
     "ios": {
-      "bundleIdentifier": "com.ledgerfinance.app",
+      "bundleIdentifier": "ai.woney.app",
       "supportsTablet": false,
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.ledgerfinance.app",
+      "package": "ai.woney.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0e1116"
+        "backgroundColor": "#141210"
       }
     }
   }

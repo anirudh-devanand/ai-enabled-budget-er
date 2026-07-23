@@ -66,6 +66,15 @@ export interface AccountResponse {
   currency: string;
   balance: string;
   masked_number: string | null;
+  nickname?: string | null;
+  notes?: string | null;
+  hidden?: boolean;
+  display_name?: string | null;
+  institution_name?: string | null;
+}
+
+export interface AccountDetailResponse extends AccountResponse {
+  recent_transactions: TransactionResponse[];
 }
 
 export interface TransactionResponse {
@@ -87,11 +96,33 @@ export interface TransactionListResponse {
   total: number;
 }
 
+export interface TransactionFilters {
+  limit?: number;
+  offset?: number;
+  needsReview?: boolean;
+  accountId?: string;
+  categoryId?: string;
+  q?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: string;
+  maxAmount?: string;
+}
+
 export interface CategoryResponse {
   id: string;
   slug: string;
   name: string;
   parent_id: string | null;
+  icon_key?: string | null;
+  color?: string | null;
+}
+
+export interface OAuthProvider {
+  id: string;
+  name: string;
+  enabled: boolean;
+  auth_url: string | null;
 }
 
 export interface TransactionCorrectionResponse {

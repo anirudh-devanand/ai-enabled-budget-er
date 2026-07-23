@@ -9,8 +9,10 @@ from app.connections.service import user_in_household
 from app.core.llm import LlmClient, LlmMessage, NullLlmClient, get_llm_client
 
 
+from app.assistant.offline import format_offline_reply
+
 SYSTEM_PROMPT = (
-    "You are Ledger, a personal finance assistant. Answer using tools that read the "
+    "You are Woney, a personal finance assistant. Answer using tools that read the "
     "user's real data. Never invent balances or transactions. Do not give specific "
     "securities recommendations. Keep answers concise and cite numbers from tool results. "
     "You may include a chart hint as JSON on its own line like "
@@ -65,16 +67,11 @@ async def chat(
         if m.role in ("user", "assistant"):
             messages.append(LlmMessage(role=m.role, content=m.content))
 
-    # Offline / no-key path: deterministic tool-backed answer without an LLM.
+    # Offline / no-key path: deterministic tool-backed natural language answer.
     if isinstance(llm, NullLlmClient):
         spending = await run_tool(db, conversation.household_id, "get_spending_summary", {})
         net = await run_tool(db, conversation.household_id, "get_net_worth", {})
-        reply = (
-            f"Here's what I can see from your accounts (no LLM key configured).\n"
-            f"Net worth: {net}\n"
-            f"Recent spending by category: {spending}\n"
-            f"You asked: {user_text}"
-        )
+        reply = format_offline_reply(user_text, spending, net)
         assistant = Message(
             conversation_id=conversation.id, role="assistant", content=reply
         )

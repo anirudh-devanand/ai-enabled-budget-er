@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -41,6 +41,9 @@ class Account(Base):
     currency: Mapped[str] = mapped_column(String(3), default="CAD")
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     masked_number: Mapped[str | None] = mapped_column(String(8), default=None)
+    nickname: Mapped[str | None] = mapped_column(String(120), default=None)
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

@@ -10,6 +10,7 @@ from app.core.database import Base
 # Import models so they register on Base.metadata.
 from app.auth import models as _auth_models  # noqa: F401
 from app.assistant import models as _assistant_models  # noqa: F401
+from app.enrichment import prefs as _prefs_models  # noqa: F401
 from app.budgets import models as _budget_models  # noqa: F401
 from app.connections import models as _connection_models  # noqa: F401
 from app.enrichment import models as _enrichment_models  # noqa: F401

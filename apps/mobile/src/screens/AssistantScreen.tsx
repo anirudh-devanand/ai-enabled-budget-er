@@ -53,12 +53,17 @@ export function AssistantScreen() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.h1}>Assistant</Text>
+        <Text style={styles.h1}>Ask Woney</Text>
+        <Text style={styles.lede}>Answers grounded in your live account data.</Text>
+        {replies.length === 0 && (
+          <Text style={styles.muted}>Try “How much did I spend on dining?”</Text>
+        )}
         {replies.map((r, i) => (
           <View
             key={`${i}-${r.role}`}
             style={[styles.bubble, r.role === "user" ? styles.user : styles.assistant]}
           >
+            <Text style={styles.bubbleLabel}>{r.role === "user" ? "You" : "Woney"}</Text>
             <Text style={styles.bubbleText}>{r.content}</Text>
           </View>
         ))}
@@ -84,19 +89,27 @@ export function AssistantScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 24 },
-  h1: { color: colors.text, fontSize: 22, fontWeight: "700", marginBottom: 12 },
+  h1: { color: colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  lede: { color: colors.muted, marginBottom: 14, marginTop: 2 },
+  muted: { color: colors.muted, marginBottom: 12 },
   bubble: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     maxWidth: "92%",
   },
-  user: { backgroundColor: "#2a3a5c", alignSelf: "flex-end" },
+  user: { backgroundColor: colors.accentSoft, alignSelf: "flex-end" },
   assistant: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     alignSelf: "flex-start",
+  },
+  bubbleLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 4,
   },
   bubbleText: { color: colors.text, lineHeight: 20 },
   composer: {
@@ -104,22 +117,23 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     padding: 12,
     gap: 8,
+    backgroundColor: colors.card,
   },
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
     color: colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 999,
+    paddingVertical: 14,
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: "#1a1814", fontWeight: "700" },
   error: { color: colors.danger, marginTop: 8 },
 });

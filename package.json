@@ -8,6 +8,11 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build:web": "npm run build --workspace apps/web"
+    "build:web": "npm run build --workspace apps/web",
+    "start:mobile": "npm run start --workspace apps/mobile"
+  },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }

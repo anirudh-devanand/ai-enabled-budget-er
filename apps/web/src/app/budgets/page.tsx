@@ -2,32 +2,34 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { BudgetDetailResponse } from "@ledger/api-client";
+import type { BudgetDetailResponse, CategoryResponse } from "@ledger/api-client";
+import { AppShell, CategoryIcon } from "@/components/ui";
 import { api } from "@/lib/api";
-
-function money(amount: string) {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
-    Number(amount),
-  );
-}
+import { isUnauthorized } from "@/lib/errors";
+import { formatMoney } from "@/lib/ui";
 
 export default function BudgetsPage() {
   const router = useRouter();
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [budget, setBudget] = useState<BudgetDetailResponse | null>(null);
+  const [catNames, setCatNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const households = await api.listHouseholds();
+        const [households, cats] = await Promise.all([
+          api.listHouseholds(),
+          api.listCategories(),
+        ]);
         const hid = households[0]?.id ?? null;
         setHouseholdId(hid);
+        setCatNames(Object.fromEntries(cats.map((c: CategoryResponse) => [c.id, c.name])));
         if (!hid) return;
         const list = await api.listBudgets(hid);
         if (list[0]) setBudget(await api.getBudget(list[0].id));
-      } catch {
-        router.replace("/login");
+      } catch (err) {
+        if (isUnauthorized(err)) router.replace("/login");
       }
     })();
   }, [router]);
@@ -47,56 +49,61 @@ export default function BudgetsPage() {
   }
 
   return (
-    <div className="shell">
-      <header>
-        <h1>Budgets</h1>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={propose} disabled={busy}>
+    <AppShell householdId={householdId}>
+      <div className="page-header">
+        <div>
+          <h1>Budgets</h1>
+          <p>Targets that follow your real spending — adjustable anytime.</p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="btn btn-primary" onClick={propose} disabled={busy}>
             {busy ? "Working…" : "Propose from history"}
           </button>
-          <button onClick={() => router.push("/dashboard")}>Dashboard</button>
         </div>
-      </header>
+      </div>
 
       {!budget && (
         <div className="tile">
           <h2>No budget yet</h2>
-          <p>Propose one from your recent spending, then tweak targets.</p>
+          <div className="hint" style={{ marginTop: 10 }}>
+            Propose one from recent spending, then tweak the targets that matter.
+          </div>
         </div>
       )}
 
       {budget && (
         <>
-          <p style={{ color: "var(--muted)" }}>
+          <p className="muted" style={{ marginTop: 0 }}>
             {budget.name} · {budget.mode}
             {budget.period_start ? ` · ${budget.period_start} → ${budget.period_end}` : ""}
           </p>
-          <div className="tile" style={{ padding: 0 }}>
-            {budget.categories.map((c) => (
-              <div
-                key={c.category_id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "12px 20px",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <span style={{ color: "var(--muted)" }}>{c.category_id.slice(0, 8)}…</span>
-                <span>
-                  {money(c.actual)} / {money(c.target)}
-                  <span className="badge" style={{ marginLeft: 10, marginTop: 0 }}>
-                    {Number(c.remaining) >= 0 ? `${money(c.remaining)} left` : "over"}
+          <div className="list-card">
+            {budget.categories.map((c) => {
+              const name = catNames[c.category_id] ?? "Category";
+              const over = Number(c.remaining) < 0;
+              return (
+                <div className="txn-row" key={c.category_id}>
+                  <CategoryIcon name={name} />
+                  <div className="txn-meta">
+                    <div className="name">{name}</div>
+                    <div className="sub">
+                      {formatMoney(c.actual)} of {formatMoney(c.target)}
+                    </div>
+                  </div>
+                  <span className={`badge${over ? " badge-warn" : ""}`}>
+                    {over ? "Over" : `${formatMoney(c.remaining)} left`}
                   </span>
-                </span>
-              </div>
-            ))}
+                </div>
+              );
+            })}
             {budget.categories.length === 0 && (
-              <p style={{ padding: 20, color: "var(--muted)" }}>No category targets yet.</p>
+              <p style={{ padding: 24 }} className="muted">
+                No category targets yet.
+              </p>
             )}
           </div>
         </>
       )}
-    </div>
+    </AppShell>
   );
 }

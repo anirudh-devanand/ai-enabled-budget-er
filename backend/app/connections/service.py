@@ -1,5 +1,6 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +165,13 @@ async def list_transactions(
     limit: int,
     offset: int,
     needs_review: bool | None = None,
+    account_id: uuid.UUID | None = None,
+    category_id: uuid.UUID | None = None,
+    q: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
 ) -> tuple[list[Transaction], int]:
     from app.enrichment.models import TransactionEnrichment
 
@@ -173,10 +181,27 @@ async def list_transactions(
         .join(BankConnection, BankConnection.id == Account.connection_id)
         .where(BankConnection.household_id == household_id)
     )
-    if needs_review is not None:
-        base = base.join(
+    if account_id is not None:
+        base = base.where(Transaction.account_id == account_id)
+    if date_from is not None:
+        base = base.where(Transaction.date >= date_from)
+    if date_to is not None:
+        base = base.where(Transaction.date <= date_to)
+    if min_amount is not None:
+        base = base.where(Transaction.amount >= min_amount)
+    if max_amount is not None:
+        base = base.where(Transaction.amount <= max_amount)
+    if q:
+        like = f"%{q.strip()}%"
+        base = base.where(Transaction.raw_description.ilike(like))
+    if needs_review is not None or category_id is not None:
+        base = base.outerjoin(
             TransactionEnrichment, TransactionEnrichment.transaction_id == Transaction.id
-        ).where(TransactionEnrichment.needs_review.is_(needs_review))
+        )
+        if needs_review is not None:
+            base = base.where(TransactionEnrichment.needs_review.is_(needs_review))
+        if category_id is not None:
+            base = base.where(TransactionEnrichment.category_id == category_id)
     total = (
         await db.execute(select(func.count()).select_from(base.subquery()))
     ).scalar_one()
@@ -186,3 +211,51 @@ async def list_transactions(
         .offset(offset)
     )
     return list(result.scalars().all()), total
+
+
+async def get_account_for_user(
+    db: AsyncSession, account_id: uuid.UUID, user_id: uuid.UUID
+) -> Account | None:
+    result = await db.execute(
+        select(Account)
+        .join(BankConnection, BankConnection.id == Account.connection_id)
+        .join(HouseholdMember, HouseholdMember.household_id == BankConnection.household_id)
+        .where(Account.id == account_id, HouseholdMember.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_account(
+    db: AsyncSession,
+    account: Account,
+    *,
+    nickname: str | None = None,
+    notes: str | None = None,
+    hidden: bool | None = None,
+) -> Account:
+    if nickname is not None:
+        account.nickname = nickname.strip() or None
+    if notes is not None:
+        account.notes = notes.strip() or None
+    if hidden is not None:
+        account.hidden = hidden
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+
+def account_to_response(account: Account, institution_name: str | None = None) -> dict:
+    return {
+        "id": account.id,
+        "connection_id": account.connection_id,
+        "name": account.name,
+        "type": account.type,
+        "currency": account.currency,
+        "balance": account.balance,
+        "masked_number": account.masked_number,
+        "nickname": account.nickname,
+        "notes": account.notes,
+        "hidden": account.hidden,
+        "display_name": account.nickname or account.name,
+        "institution_name": institution_name,
+    }

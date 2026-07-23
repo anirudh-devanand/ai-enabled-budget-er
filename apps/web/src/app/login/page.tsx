@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ApiError, isMfaChallenge } from "@ledger/api-client";
+import { useEffect, useState } from "react";
+import { ApiError, isMfaChallenge, type OAuthProvider } from "@ledger/api-client";
+import { AuthBrand } from "@/components/AuthBrand";
 import { api } from "@/lib/api";
 
 export default function LoginPage() {
@@ -14,6 +15,11 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<OAuthProvider[]>([]);
+
+  useEffect(() => {
+    api.listOAuthProviders().then((r) => setProviders(r.providers)).catch(() => undefined);
+  }, []);
 
   async function submitLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -50,56 +56,100 @@ export default function LoginPage() {
 
   return (
     <main className="auth">
-      <div className="card">
-        <h1>Ledger</h1>
-        <p className="sub">
-          {challengeToken ? "Enter the code from your authenticator app" : "Sign in to continue"}
-        </p>
-        {challengeToken ? (
-          <form onSubmit={submitMfa}>
-            <label htmlFor="code">6-digit code</label>
-            <input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
-            />
-            <button className="primary" disabled={busy}>
-              Verify
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={submitLogin}>
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <button className="primary" disabled={busy}>
-              Sign in
-            </button>
-          </form>
-        )}
-        {error && <p className="error">{error}</p>}
-        <p className="alt">
-          New here? <Link href="/register">Create an account</Link>
-        </p>
-      </div>
+      <AuthBrand
+        headline="Money that feels calm."
+        lede="Clear categories, live Canadian bank sync, and a planner that never invents the math."
+      />
+      <section className="auth-panel">
+        <div className="auth-card">
+          <h1>{challengeToken ? "Confirm it’s you" : "Welcome back"}</h1>
+          <p className="sub">
+            {challengeToken
+              ? "Enter the code from your authenticator app"
+              : "Sign in to your Woney account"}
+          </p>
+          {challengeToken ? (
+            <form onSubmit={submitMfa}>
+              <div className="field">
+                <label htmlFor="code">Authentication code</label>
+                <input
+                  id="code"
+                  name="one-time-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <button className="btn btn-primary btn-block" disabled={busy}>
+                {busy ? "Verifying…" : "Verify"}
+              </button>
+            </form>
+          ) : (
+            <>
+              <div className="sso-row">
+                {providers.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="sso-btn"
+                    disabled={!p.enabled || !p.auth_url}
+                    title={
+                      p.enabled
+                        ? `Continue with ${p.name}`
+                        : `${p.name} SSO — add LEDGER_*_OAUTH credentials to enable`
+                    }
+                    onClick={() => {
+                      if (p.auth_url) window.location.href = p.auth_url;
+                    }}
+                  >
+                    Continue with {p.name}
+                    {!p.enabled ? " (soon)" : ""}
+                  </button>
+                ))}
+              </div>
+              <div className="sso-divider">or use email</div>
+              <form onSubmit={submitLogin}>
+                <div className="field">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    name="username"
+                    type="email"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="password">Password</label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <button className="btn btn-primary btn-block" disabled={busy}>
+                  {busy ? "Signing in…" : "Sign in"}
+                </button>
+              </form>
+            </>
+          )}
+          {error && <p className="error">{error}</p>}
+          <p className="alt">
+            New here? <Link href="/register">Create an account</Link>
+          </p>
+        </div>
+      </section>
     </main>
   );
 }
