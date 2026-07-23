@@ -101,9 +101,10 @@ textarea {
 
 .auth-shell {
   position: relative;
-  display: flex;
-  justify-content: flex-end;
-  width: min(920px, 100%);
+  width: min(940px, 100%);
+  /* Leave room for brand + gap; form defines height */
+  padding-left: calc(42% + 18px);
+  box-sizing: border-box;
 }
 
 .auth-brand {
@@ -119,7 +120,7 @@ textarea {
   bottom: 0;
   width: 42%;
   overflow: hidden;
-  border-radius: 24px 0 0 24px;
+  border-radius: 24px;
   box-sizing: border-box;
   z-index: 0;
 }
@@ -159,7 +160,7 @@ textarea {
 .auth-panel {
   position: relative;
   z-index: 1;
-  width: 58%;
+  width: 100%;
   padding: 0;
   display: block;
 }
@@ -169,8 +170,7 @@ textarea {
   background: #ffffff;
   color: #141414;
   border: 1px solid #e8e8e4;
-  border-radius: 0 24px 24px 0;
-  border-left: none;
+  border-radius: 24px;
   box-shadow: var(--shadow);
   padding: 36px 32px;
   box-sizing: border-box;
@@ -195,10 +195,29 @@ textarea {
   margin: 8px 0 22px;
 }
 
+.auth-card .field input,
 .auth-card input {
-  background: #ffffff;
-  color: #141414;
-  border-color: #d4d4ce;
+  background: #f6f6f4;
+  color: #141414 !important;
+  -webkit-text-fill-color: #141414;
+  border: 1px solid #e6e6e1;
+  box-shadow: none;
+  outline: none;
+}
+
+.auth-card .field input:focus,
+.auth-card input:focus {
+  border-color: #d2d2cb;
+  box-shadow: none;
+  outline: none;
+}
+
+.auth-card input:-webkit-autofill,
+.auth-card input:-webkit-autofill:hover,
+.auth-card input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #141414;
+  box-shadow: 0 0 0 1000px #f6f6f4 inset;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 .auth-card .btn-primary {
@@ -210,15 +229,25 @@ textarea {
 .auth-card .sso-btn {
   background: #ffffff;
   color: #141414;
-  border-color: #d4d4ce;
+  border-color: #e6e6e1;
 }
 
 .auth-card .sso-btn:disabled {
   color: #8a8a84;
 }
 
+.auth-card .alt a,
 .auth-card a {
-  color: #141414;
+  color: #8a6b28;
+  border-bottom: none;
+  text-decoration: none;
+}
+
+.auth-card .alt a:hover,
+.auth-card a:hover {
+  color: #6f5520;
+  border-bottom: none;
+  text-decoration: none;
 }
 
 .auth-brand .headline {
@@ -243,23 +272,23 @@ textarea {
 
 @media (max-width: 900px) {
   .auth-shell {
+    padding-left: 0;
+    width: min(440px, 100%);
     display: flex;
     flex-direction: column;
-    width: min(440px, 100%);
+    gap: 16px;
   }
   .auth-brand {
     position: relative;
     width: 100%;
     min-height: 200px;
-    border-radius: 24px 24px 0 0;
+    border-radius: 24px;
   }
   .auth-panel {
     width: 100%;
   }
   .auth-card {
-    border-radius: 0 0 24px 24px;
-    border-left: 1px solid #e8e8e4;
-    border-top: none;
+    border-radius: 24px;
   }
 }
 
@@ -287,8 +316,8 @@ textarea {
 
 .field input:focus {
   outline: none;
-  border-color: var(--text);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--border-strong);
+  box-shadow: none;
 }
 
 .btn {
@@ -975,8 +1004,8 @@ input {
 }
 
 .alt a {
-  color: var(--text);
-  border-bottom: 1px solid var(--border-strong);
+  color: #8a6b28;
+  border-bottom: none;
 }
 
 .pw-checks li.ok {
