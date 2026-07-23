@@ -255,7 +255,7 @@ export class LedgerClient {
     institutionName?: string;
     file: Blob;
     fileName?: string;
-  }) {
+  }): Promise<{ connection: ConnectionResponse; imported_transactions: number }> {
     const form = new FormData();
     form.append("household_id", input.householdId);
     form.append("account_name", input.accountName);
