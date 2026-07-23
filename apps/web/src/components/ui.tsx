@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CategoryIcon } from "@/components/CategoryChip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
 import { passwordScore } from "@/lib/ui";
 
@@ -51,6 +52,7 @@ export function AppShell({
           ))}
         </nav>
         <div className="nav-footer">
+          <ThemeToggle />
           <button type="button" className="btn btn-ghost btn-block" onClick={logout}>
             Sign out
           </button>

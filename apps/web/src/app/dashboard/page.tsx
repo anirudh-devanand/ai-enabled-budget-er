@@ -8,6 +8,7 @@ import type {
   TransactionResponse,
   UserResponse,
 } from "@ledger/api-client";
+import { BankLogo } from "@/components/BankLogo";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
@@ -79,10 +80,13 @@ export default function DashboardPage() {
             key={a.id}
             onClick={() => router.push(`/accounts/${a.id}`)}
           >
-            <p className="label">
-              {a.display_name || a.name}
-              {a.masked_number ? ` ····${a.masked_number}` : ""}
-            </p>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 4 }}>
+              <BankLogo institutionName={a.institution_name || a.name} size={40} />
+              <p className="label" style={{ margin: 0 }}>
+                {a.display_name || a.name}
+                {a.masked_number ? ` ····${a.masked_number}` : ""}
+              </p>
+            </div>
             <p className="amount">{formatMoney(a.balance, a.currency)}</p>
             <p className="meta">
               {a.type}

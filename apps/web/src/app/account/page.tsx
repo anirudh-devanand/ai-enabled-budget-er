@@ -4,11 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { CategoryResponse, ConnectionResponse, UserResponse } from "@ledger/api-client";
+import { BankLogo } from "@/components/BankLogo";
 import { CategoryGlyph } from "@/components/CategoryIcon";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { CategoryIcon, AppShell } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
+
+function formatSynced(iso: string | null | undefined) {
+  if (!iso) return "Never synced";
+  try {
+    return `Synced ${new Date(iso).toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })}`;
+  } catch {
+    return `Synced ${iso.slice(0, 10)}`;
+  }
+}
 
 export default function AccountPage() {
   const router = useRouter();
@@ -21,6 +36,7 @@ export default function AccountPage() {
   const [colors, setColors] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [extrasAvailable, setExtrasAvailable] = useState(true);
 
@@ -90,6 +106,20 @@ export default function AccountPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
+  async function syncBank(connectionId: string) {
+    setSyncingId(connectionId);
+    try {
+      await api.syncConnection(connectionId);
+      setToast("Accounts refreshed");
+      await load();
+    } catch {
+      setToast("Sync failed");
+    } finally {
+      setSyncingId(null);
+      setTimeout(() => setToast(null), 2500);
+    }
+  }
+
   if (!user) {
     return (
       <div className="app-main">
@@ -98,80 +128,127 @@ export default function AccountPage() {
     );
   }
 
+  const initial = (displayName || user.email || "W").trim().charAt(0).toUpperCase();
+
   return (
     <AppShell householdId={householdId}>
       <div className="page-header">
         <div>
           <h1>Account</h1>
-          <p>Profile, bank links, and category styling.</p>
+          <p>Your profile, linked banks, and how Woney looks.</p>
         </div>
+        {householdId && (
+          <div className="page-actions">
+            <Link href={`/connect?household=${householdId}`} className="btn btn-primary">
+              Link a bank
+            </Link>
+          </div>
+        )}
       </div>
 
       {toast && <div className="toast">{toast}</div>}
 
-      <div className="section-title">Profile</div>
-      <div className="tile" style={{ maxWidth: 480, marginBottom: 24 }}>
-        <div className="field">
-          <label htmlFor="email">Email</label>
-          <input id="email" value={user.email} disabled />
+      <section className="account-hero">
+        <div className="account-avatar" aria-hidden>
+          {initial}
         </div>
-        <div className="field">
-          <label htmlFor="name">Display name</label>
-          <input
-            id="name"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            autoComplete="name"
-          />
+        <div>
+          <h2>{displayName || "Your account"}</h2>
+          <p>{user.email}</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={busy}>
-          Save profile
-        </button>
+        <ThemeToggle />
+      </section>
+
+      <div className="account-grid">
+        <section className="account-panel">
+          <h3>Profile</h3>
+          <p className="panel-lede">How your name appears across Woney.</p>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" value={user.email} disabled />
+          </div>
+          <div className="field">
+            <label htmlFor="name">Display name</label>
+            <input
+              id="name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoComplete="name"
+            />
+          </div>
+          <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={busy}>
+            Save profile
+          </button>
+        </section>
+
+        <section className="account-panel">
+          <h3>Appearance</h3>
+          <p className="panel-lede">
+            Light mode is gold on white. Dark mode is gold on black. Your choice is saved on this
+            device.
+          </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              padding: "14px 16px",
+              borderRadius: 14,
+              border: "1px solid var(--border)",
+              background: "var(--surface-muted)",
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700 }}>Theme</div>
+              <div className="muted" style={{ fontSize: "0.85rem", marginTop: 2 }}>
+                Switch between light and dark
+              </div>
+            </div>
+            <ThemeToggle />
+          </div>
+        </section>
       </div>
 
       <div className="section-title">Linked banks</div>
-      <div className="list-card" style={{ marginBottom: 20 }}>
+      <div className="list-card" style={{ marginBottom: 28, overflow: "hidden" }}>
         {connections.map((c) => (
-          <div className="txn-row" key={c.id}>
-            <div className="txn-meta">
-              <div className="name">{c.institution_name || "Bank connection"}</div>
+          <div className="bank-row" key={c.id}>
+            <BankLogo institutionName={c.institution_name || c.provider} />
+            <div className="bank-row-meta">
+              <div className="name">{c.institution_name || `${c.provider} connection`}</div>
               <div className="sub">
-                {c.status}
-                {c.last_synced_at ? ` · synced ${c.last_synced_at.slice(0, 10)}` : ""}
+                <span className={`status-pill${c.status === "error" ? " error" : ""}`}>
+                  {c.status}
+                </span>
+                <span>{formatSynced(c.last_synced_at)}</span>
+                <span style={{ textTransform: "capitalize" }}>{c.provider}</span>
               </div>
             </div>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={async () => {
-                try {
-                  await api.syncConnection(c.id);
-                  setToast("Sync started");
-                  await load();
-                } catch {
-                  setToast("Sync failed");
-                }
-              }}
+              disabled={c.provider === "csv" || syncingId === c.id}
+              title={c.provider === "csv" ? "CSV imports can’t re-sync" : "Refresh accounts"}
+              onClick={() => syncBank(c.id)}
             >
-              Sync
+              {syncingId === c.id ? "Syncing…" : "Sync"}
             </button>
           </div>
         ))}
         {connections.length === 0 && (
-          <p style={{ padding: 20 }} className="muted">
-            No banks linked yet.
-          </p>
+          <div style={{ padding: 28 }}>
+            <p className="muted" style={{ marginTop: 0 }}>
+              No banks linked yet. Connect with Plaid or import a CSV for Neo.
+            </p>
+            {householdId && (
+              <Link href={`/connect?household=${householdId}`} className="btn btn-primary">
+                Link a bank
+              </Link>
+            )}
+          </div>
         )}
       </div>
-      {householdId && (
-        <Link
-          href={`/connect?household=${householdId}`}
-          className="btn btn-primary"
-          style={{ textDecoration: "none", display: "inline-flex", marginBottom: 28 }}
-        >
-          Link a bank
-        </Link>
-      )}
 
       <div className="section-title">Category icons & colors</div>
       <p className="muted" style={{ marginTop: 0 }}>
