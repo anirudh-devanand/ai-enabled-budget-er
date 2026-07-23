@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import type { CategoryResponse, ConnectionResponse, UserResponse } from "@ledger/api-client";
 import { BankLogo } from "@/components/BankLogo";
 import { CategoryGlyph } from "@/components/CategoryIcon";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { CategoryIcon, AppShell } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
@@ -135,7 +134,7 @@ export default function AccountPage() {
       <div className="page-header">
         <div>
           <h1>Account</h1>
-          <p>Your profile, linked banks, and how Woney looks.</p>
+          <p>Profile, linked banks, and category styling.</p>
         </div>
         {householdId && (
           <div className="page-actions">
@@ -156,7 +155,6 @@ export default function AccountPage() {
           <h2>{displayName || "Your account"}</h2>
           <p>{user.email}</p>
         </div>
-        <ThemeToggle />
       </section>
 
       <div className="account-grid">
@@ -179,34 +177,6 @@ export default function AccountPage() {
           <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={busy}>
             Save profile
           </button>
-        </section>
-
-        <section className="account-panel">
-          <h3>Appearance</h3>
-          <p className="panel-lede">
-            Light mode is gold on white. Dark mode is gold on black. Your choice is saved on this
-            device.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              padding: "14px 16px",
-              borderRadius: 14,
-              border: "1px solid var(--border)",
-              background: "var(--surface-muted)",
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 700 }}>Theme</div>
-              <div className="muted" style={{ fontSize: "0.85rem", marginTop: 2 }}>
-                Switch between light and dark
-              </div>
-            </div>
-            <ThemeToggle />
-          </div>
         </section>
       </div>
 
@@ -290,7 +260,7 @@ export default function AccountPage() {
                             background: c.color || "#f3ead5",
                             border:
                               c.icon_key === icon
-                                ? "2px solid var(--gold)"
+                                ? "2px solid var(--text)"
                                 : "1px solid var(--border)",
                             cursor: "pointer",
                           }}
@@ -316,7 +286,7 @@ export default function AccountPage() {
                             background: color,
                             border:
                               c.color === color
-                                ? "2px solid var(--gold)"
+                                ? "2px solid var(--text)"
                                 : "1px solid var(--border)",
                             cursor: "pointer",
                           }}
