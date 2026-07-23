@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApiError, isMfaChallenge } from "@ledger/api-client";
+import { readOAuthProvider } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
 
 function OAuthCallbackInner() {
@@ -16,10 +17,11 @@ function OAuthCallbackInner() {
       setError("Missing authorization code");
       return;
     }
+    const provider = readOAuthProvider(params.get("state"));
     const redirectUri = `${window.location.origin}/login/oauth/callback`;
     (async () => {
       try {
-        const result = await api.loginWithGoogleCode(code, redirectUri);
+        const result = await api.loginWithOAuthCode(provider, code, redirectUri);
         if (isMfaChallenge(result)) {
           router.replace("/login");
           return;

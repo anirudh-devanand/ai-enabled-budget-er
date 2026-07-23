@@ -5,7 +5,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="LEDGER_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="LEDGER_",
+        extra="ignore",
+        # Treat "" from host dashboards as unset (common on Render placeholders).
+        env_ignore_empty=True,
+    )
 
     app_name: str = "ledger-api"
     env: str = "development"  # development | production
@@ -36,6 +42,7 @@ class Settings(BaseSettings):
     flinks_days_of_transactions: str = "Days365"
 
     # Plaid (primary indie path). Sandbox free; Trial/Production for real CA banks.
+    # Exact Render names: LEDGER_PLAID_CLIENT_ID, LEDGER_PLAID_SECRET, LEDGER_PLAID_ENV
     plaid_client_id: str | None = None
     plaid_secret: str | None = None
     plaid_env: str = "sandbox"  # sandbox | development | production
@@ -55,6 +62,8 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str | None = None
     apple_oauth_client_id: str | None = None
     apple_oauth_team_id: str | None = None
+    apple_oauth_key_id: str | None = None
+    apple_oauth_private_key: str | None = None
     microsoft_oauth_client_id: str | None = None
     microsoft_oauth_client_secret: str | None = None
     oauth_redirect_uri: str = "http://localhost:3000/login/oauth/callback"
@@ -64,8 +73,57 @@ class Settings(BaseSettings):
     def normalize_env(cls, value: str) -> str:
         return value.strip().lower()
 
+    @field_validator(
+        "plaid_client_id",
+        "plaid_secret",
+        "google_oauth_client_id",
+        "google_oauth_client_secret",
+        "apple_oauth_client_id",
+        "apple_oauth_team_id",
+        "apple_oauth_key_id",
+        "apple_oauth_private_key",
+        "microsoft_oauth_client_id",
+        "microsoft_oauth_client_secret",
+        "ops_token",
+        "llm_api_key",
+        "flinks_auth_key",
+        mode="before",
+    )
+    @classmethod
+    def blank_to_none(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            # Allow PEM keys that use \n escapes from env dashboards.
+            if "\\n" in stripped and "BEGIN" in stripped:
+                stripped = stripped.replace("\\n", "\n")
+            return stripped or None
+        return value
+
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def plaid_configured(self) -> bool:
+        return bool(self.plaid_client_id and self.plaid_secret)
+
+    @property
+    def google_oauth_configured(self) -> bool:
+        return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
+
+    @property
+    def apple_oauth_configured(self) -> bool:
+        return bool(
+            self.apple_oauth_client_id
+            and self.apple_oauth_team_id
+            and self.apple_oauth_key_id
+            and self.apple_oauth_private_key
+        )
+
+    @property
+    def microsoft_oauth_configured(self) -> bool:
+        return bool(self.microsoft_oauth_client_id and self.microsoft_oauth_client_secret)
 
     def assert_production_safe(self) -> None:
         if self.env != "production":

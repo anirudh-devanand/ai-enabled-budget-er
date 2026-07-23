@@ -64,8 +64,11 @@ class PlaidProvider:
 
     async def create_link_token(self, *, client_user_id: str) -> str:
         settings = get_settings()
-        if not settings.plaid_client_id or not settings.plaid_secret:
-            raise ProviderError("Plaid is not configured (set LEDGER_PLAID_CLIENT_ID and LEDGER_PLAID_SECRET)")
+        if not settings.plaid_configured:
+            raise ProviderError(
+                "Plaid is not configured (set LEDGER_PLAID_CLIENT_ID and LEDGER_PLAID_SECRET "
+                "on the API host, then redeploy; GET /healthz reports plaid_configured)"
+            )
         body = {
             "client_id": settings.plaid_client_id,
             "secret": settings.plaid_secret,
@@ -98,7 +101,7 @@ class PlaidProvider:
 
     async def fetch_snapshot(self, login_id: str) -> ProviderSnapshot:
         settings = get_settings()
-        if not settings.plaid_client_id or not settings.plaid_secret:
+        if not settings.plaid_configured:
             raise ProviderError("Plaid is not configured")
         access_token = login_id
         auth = {

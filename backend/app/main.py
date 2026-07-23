@@ -58,12 +58,23 @@ app.include_router(ops_router)
 
 
 @app.get("/healthz", tags=["ops"])
-async def healthz() -> dict[str, str]:
+async def healthz() -> dict:
+    """Liveness + non-secret config flags (helps verify Render env vars)."""
     from fastapi import HTTPException
 
+    s = get_settings()
+    flags = {
+        "plaid_configured": s.plaid_configured,
+        "plaid_env": s.plaid_env,
+        "google_oauth_configured": s.google_oauth_configured,
+        "apple_oauth_configured": s.apple_oauth_configured,
+        "microsoft_oauth_configured": s.microsoft_oauth_configured,
+    }
     try:
         async with get_engine().connect() as conn:
             await conn.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "up"}
+        return {"status": "ok", "database": "up", **flags}
     except Exception as exc:
-        raise HTTPException(status_code=503, detail={"status": "degraded", "database": "down"}) from exc
+        raise HTTPException(
+            status_code=503, detail={"status": "degraded", "database": "down", **flags}
+        ) from exc

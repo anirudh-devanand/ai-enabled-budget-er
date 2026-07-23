@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, isMfaChallenge, type OAuthProvider } from "@ledger/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { SsoButtons } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
 
 export default function LoginPage() {
@@ -89,28 +90,7 @@ export default function LoginPage() {
             </form>
           ) : (
             <>
-              <div className="sso-row">
-                {providers.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="sso-btn"
-                    disabled={!p.enabled || !p.auth_url}
-                    title={
-                      p.enabled
-                        ? `Continue with ${p.name}`
-                        : `${p.name} SSO — add LEDGER_*_OAUTH credentials to enable`
-                    }
-                    onClick={() => {
-                      if (p.auth_url) window.location.href = p.auth_url;
-                    }}
-                  >
-                    Continue with {p.name}
-                    {!p.enabled ? " (soon)" : ""}
-                  </button>
-                ))}
-              </div>
-              <div className="sso-divider">or use email</div>
+              <SsoButtons providers={providers} />
               <form onSubmit={submitLogin}>
                 <div className="field">
                   <label htmlFor="email">Email</label>

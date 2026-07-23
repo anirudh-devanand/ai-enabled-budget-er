@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { ApiError } from "@ledger/api-client";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError, type OAuthProvider } from "@ledger/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
 import { passwordScore } from "@/lib/ui";
@@ -16,7 +17,12 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const strength = useMemo(() => passwordScore(password), [password]);
+
+  useEffect(() => {
+    api.listOAuthProviders().then((r) => setProviders(r.providers)).catch(() => undefined);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +53,8 @@ export default function RegisterPage() {
       <section className="auth-panel">
         <div className="auth-card">
           <h1>Create your account</h1>
-          <p className="sub">Takes about a minute.</p>
+          <p className="sub">Takes about a minute — or continue with SSO.</p>
+          <SsoButtons providers={providers} />
           <form onSubmit={submit}>
             <div className="field">
               <label htmlFor="name">Full name</label>

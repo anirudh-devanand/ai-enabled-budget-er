@@ -194,10 +194,18 @@ export class LedgerClient {
   }
 
   async loginWithGoogleCode(code: string, redirectUri?: string) {
-    const result = await this.request<LoginResponse>("POST", "/v1/auth/oauth/google/callback", {
-      code,
-      redirect_uri: redirectUri,
-    });
+    return this.loginWithOAuthCode("google", code, redirectUri);
+  }
+
+  async loginWithOAuthCode(provider: string, code: string, redirectUri?: string) {
+    const result = await this.request<LoginResponse>(
+      "POST",
+      `/v1/auth/oauth/${provider}/callback`,
+      {
+        code,
+        redirect_uri: redirectUri,
+      },
+    );
     if ("access_token" in result) this.storage.setTokens(result);
     return result;
   }
