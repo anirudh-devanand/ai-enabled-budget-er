@@ -25,11 +25,18 @@ async def user_in_household(
 
 
 async def create_connection(
-    db: AsyncSession, household_id: uuid.UUID, login_id: str
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    login_id: str,
+    *,
+    provider: str = "flinks",
+    institution_name: str | None = None,
 ) -> BankConnection:
     connection = BankConnection(
         household_id=household_id,
+        provider=provider,
         login_id_encrypted=encrypt_secret(login_id),
+        institution_name=institution_name,
     )
     db.add(connection)
     await db.commit()

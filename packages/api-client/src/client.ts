@@ -229,6 +229,70 @@ export class LedgerClient {
     );
   }
 
+  createPlaidLinkToken(householdId: string) {
+    return this.request<{ link_token: string }>(
+      "POST",
+      "/v1/connections/plaid/link-token",
+      { household_id: householdId },
+      { auth: true },
+    );
+  }
+
+  createPlaidConnection(householdId: string, publicToken: string) {
+    return this.request<ConnectionResponse>(
+      "POST",
+      "/v1/connections/plaid",
+      { household_id: householdId, public_token: publicToken },
+      { auth: true },
+    );
+  }
+
+  async importCsvStatement(input: {
+    householdId: string;
+    accountName: string;
+    accountType?: string;
+    currency?: string;
+    institutionName?: string;
+    file: Blob;
+    fileName?: string;
+  }) {
+    const form = new FormData();
+    form.append("household_id", input.householdId);
+    form.append("account_name", input.accountName);
+    form.append("account_type", input.accountType ?? "chequing");
+    form.append("currency", input.currency ?? "CAD");
+    if (input.institutionName) form.append("institution_name", input.institutionName);
+    form.append("file", input.file, input.fileName ?? "statement.csv");
+
+    const headers: Record<string, string> = {};
+    const token = this.storage.getAccessToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const resp = await fetch(`${this.baseUrl}/v1/connections/import`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    if (resp.status === 401) {
+      const refreshed = await this.tryRefresh();
+      if (refreshed) return this.importCsvStatement(input);
+    }
+    if (!resp.ok) {
+      let detail = resp.statusText;
+      try {
+        const data = await resp.json();
+        if (typeof data.detail === "string") detail = data.detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(resp.status, detail);
+    }
+    return (await resp.json()) as {
+      connection: ConnectionResponse;
+      imported_transactions: number;
+    };
+  }
+
   syncConnection(connectionId: string) {
     return this.request<ConnectionResponse>(
       "POST",

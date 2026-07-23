@@ -1,15 +1,17 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections import service
+from app.connections.csv_import import parse_bank_csv
 from app.connections.demo_seed import DemoSeedProvider
 from app.connections.flinks import FlinksProvider
 from app.connections.models import BankConnection
+from app.connections.plaid import PlaidProvider
 from app.connections.provider import BankProvider, ProviderError, ProviderSnapshot
 from app.connections.schemas import (
     AccountDetailResponse,
@@ -17,13 +19,17 @@ from app.connections.schemas import (
     AccountUpdateRequest,
     ConnectionCreateRequest,
     ConnectionResponse,
+    CsvImportResponse,
+    PlaidExchangeRequest,
+    PlaidLinkTokenRequest,
+    PlaidLinkTokenResponse,
     TransactionListResponse,
     TransactionResponse,
 )
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.enrichment.normalize import prettify_descriptor
-from app.enrichment.service import enrichment_maps
+from app.enrichment.service import enrichment_maps, enrich_transactions
 from app.users.models import User
 
 router = APIRouter(prefix="/v1/connections", tags=["connections"])
@@ -36,10 +42,16 @@ class CompositeBankProvider:
     def __init__(self) -> None:
         self._flinks = FlinksProvider()
         self._demo = DemoSeedProvider()
+        self._plaid = PlaidProvider()
 
     async def fetch_snapshot(self, login_id: str) -> ProviderSnapshot:
         if login_id.startswith("demo-seed:"):
             return await self._demo.fetch_snapshot(login_id)
+        if login_id.startswith("access-") or login_id.startswith("plaid:"):
+            token = login_id.removeprefix("plaid:")
+            return await self._plaid.fetch_snapshot(token)
+        if login_id.startswith("csv:"):
+            raise ProviderError("CSV imports cannot be re-synced from the aggregator")
         return await self._flinks.fetch_snapshot(login_id)
 
 
@@ -79,12 +91,96 @@ def _tx_responses(items, enrichments, merchants, categories) -> list[Transaction
     return responses
 
 
+@router.post("/plaid/link-token", response_model=PlaidLinkTokenResponse)
+async def create_plaid_link_token(
+    body: PlaidLinkTokenRequest, user: CurrentUser, db: DbDep
+):
+    await _require_membership(db, user, body.household_id)
+    try:
+        token = await PlaidProvider().create_link_token(client_user_id=str(user.id))
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    return PlaidLinkTokenResponse(link_token=token)
+
+
+@router.post("/plaid", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
+async def create_plaid_connection(
+    body: PlaidExchangeRequest, user: CurrentUser, db: DbDep, provider: ProviderDep
+):
+    await _require_membership(db, user, body.household_id)
+    plaid = PlaidProvider()
+    try:
+        access_token = await plaid.exchange_public_token(body.public_token)
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Plaid exchange failed: {exc}") from exc
+    connection = await service.create_connection(
+        db, body.household_id, access_token, provider="plaid"
+    )
+    try:
+        connection = await service.sync_connection(db, connection, provider)
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
+    return connection
+
+
+@router.post("/import", response_model=CsvImportResponse, status_code=status.HTTP_201_CREATED)
+async def import_csv_statement(
+    user: CurrentUser,
+    db: DbDep,
+    household_id: Annotated[uuid.UUID, Form()],
+    account_name: Annotated[str, Form()],
+    file: UploadFile = File(...),
+    account_type: Annotated[str, Form()] = "chequing",
+    currency: Annotated[str, Form()] = "CAD",
+    institution_name: Annotated[str | None, Form()] = None,
+):
+    await _require_membership(db, user, household_id)
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
+    if len(raw) > 5_000_000:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File too large (max 5 MB)")
+    try:
+        snapshot = parse_bank_csv(
+            raw,
+            account_name=account_name.strip() or "Imported account",
+            account_type=account_type.strip() or "chequing",
+            currency=currency.strip() or "CAD",
+            institution_name=(institution_name or "").strip() or file.filename or "CSV import",
+        )
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    login_id = f"csv:{uuid.uuid4()}"
+    connection = await service.create_connection(
+        db,
+        household_id,
+        login_id,
+        provider="csv",
+        institution_name=snapshot.institution_name,
+    )
+    new_transactions = await service._apply_snapshot(db, connection, snapshot)
+    await enrich_transactions(db, connection.household_id, new_transactions)
+    connection.institution_name = snapshot.institution_name
+    connection.status = "active"
+    connection.last_synced_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(connection)
+    return CsvImportResponse(
+        connection=ConnectionResponse.model_validate(connection),
+        imported_transactions=len(new_transactions),
+    )
+
+
 @router.post("/", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection(
     body: ConnectionCreateRequest, user: CurrentUser, db: DbDep, provider: ProviderDep
 ):
     await _require_membership(db, user, body.household_id)
-    connection = await service.create_connection(db, body.household_id, body.login_id)
+    provider_name = "demo" if body.login_id.startswith("demo-seed:") else "flinks"
+    connection = await service.create_connection(
+        db, body.household_id, body.login_id, provider=provider_name
+    )
     try:
         connection = await service.sync_connection(db, connection, provider)
     except ProviderError as exc:
@@ -99,6 +195,11 @@ async def resync_connection(
     connection = await service.get_connection_for_user(db, connection_id, user.id)
     if connection is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    if connection.provider == "csv":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "CSV imports cannot be re-synced — upload a new statement instead",
+        )
     try:
         return await service.sync_connection(db, connection, provider)
     except ProviderError as exc:

@@ -830,7 +830,7 @@ button.account-card {
   letter-spacing: -0.02em;
 }
 .shell header button,
-button:not(.btn):not(.primary):not(.account-card):not(.cat-icon):not(.sso-btn) {
+button:not(.btn):not(.primary):not(.account-card):not(.cat-icon):not(.sso-btn):not(.seg-btn) {
   background: #fff;
   border: 1px solid var(--border-strong);
   color: var(--text);
@@ -933,4 +933,55 @@ input {
   color: var(--text);
   background: var(--accent-soft);
   border-left: 3px solid var(--gold);
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-top: 8px;
+  background: rgba(26, 24, 20, 0.04);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(20, 32, 26, 0.08);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stack input,
+.stack select {
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
 }

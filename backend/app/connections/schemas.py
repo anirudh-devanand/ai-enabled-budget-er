@@ -7,7 +7,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ConnectionCreateRequest(BaseModel):
     household_id: uuid.UUID
-    login_id: str = Field(min_length=8, max_length=64)
+    # Flinks loginId or demo-seed:… token (legacy / QA path).
+    login_id: str = Field(min_length=8, max_length=128)
+
+
+class PlaidLinkTokenRequest(BaseModel):
+    household_id: uuid.UUID
+
+
+class PlaidLinkTokenResponse(BaseModel):
+    link_token: str
+
+
+class PlaidExchangeRequest(BaseModel):
+    household_id: uuid.UUID
+    public_token: str = Field(min_length=10, max_length=256)
 
 
 class ConnectionResponse(BaseModel):
@@ -20,6 +34,11 @@ class ConnectionResponse(BaseModel):
     status: str
     last_synced_at: datetime | None
     created_at: datetime
+
+
+class CsvImportResponse(BaseModel):
+    connection: ConnectionResponse
+    imported_transactions: int
 
 
 class TransactionResponse(BaseModel):

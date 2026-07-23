@@ -29,11 +29,19 @@ class Settings(BaseSettings):
     # Shared secret for cron/batch ops (X-Ops-Token). Required in production for /v1/ops/*.
     ops_token: str | None = None
 
-    # Flinks (Canadian bank aggregation). Defaults point at the public sandbox.
+    # Flinks (legacy / enterprise). Kept for the provider interface; not required.
     flinks_base_url: str = "https://toolbox-api.private.fin.ag"
     flinks_customer_id: str = "43387ca6-0391-4c82-857d-70d95f087ecb"
     flinks_auth_key: str | None = None
     flinks_days_of_transactions: str = "Days365"
+
+    # Plaid (primary indie path). Sandbox free; Trial/Production for real CA banks.
+    plaid_client_id: str | None = None
+    plaid_secret: str | None = None
+    plaid_env: str = "sandbox"  # sandbox | development | production
+    plaid_products: str = "transactions"
+    plaid_country_codes: str = "CA"
+    plaid_days_of_transactions: int = 365
 
     # Optional LLM (Anthropic). When unset, enrichment/assistant skip LLM stages.
     llm_api_key: str | None = None
