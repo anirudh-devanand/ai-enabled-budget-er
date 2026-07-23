@@ -19,9 +19,13 @@ export const metadata: Metadata = {
   title: "Woney — Money, made clear",
   description: "Canadian personal finance with clear categorization and calm planning.",
   icons: {
-    icon: [{ url: "/brand/woney-icon.png", type: "image/png" }],
-    apple: [{ url: "/brand/woney-icon.png", type: "image/png" }],
-    shortcut: ["/brand/woney-icon.png"],
+    icon: [
+      { url: "/brand/woney-favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/woney-favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/brand/woney-favicon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/woney-favicon-180.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon.ico"],
   },
 };
 
