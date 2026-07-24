@@ -7,14 +7,11 @@ import re
 from decimal import Decimal
 from typing import Any
 
+from app.core.money import format_money
+
 
 def _money(amount: Any, currency: str = "CAD") -> str:
-    try:
-        value = Decimal(str(amount))
-    except Exception:
-        return str(amount)
-    sign = "-" if value < 0 else ""
-    return f"{sign}${abs(value):,.2f} {currency}"
+    return format_money(amount, currency=currency)
 
 
 def _parse(raw: str) -> Any:

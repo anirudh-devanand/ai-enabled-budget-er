@@ -9,6 +9,7 @@ from app.connections.models import Account, BankConnection, Transaction
 from app.connections.service import user_in_household
 from app.enrichment.models import Category, TransactionEnrichment
 from app.enrichment.service import ensure_default_categories
+from app.core.money import format_money, quantize_money
 from app.planner.engine import project_goal, recommend_cuts, simulate_scenario
 from app.planner.models import Goal, Plan, PlanItem
 
@@ -21,7 +22,7 @@ async def monthly_surplus(db: AsyncSession, household_id: uuid.UUID) -> Decimal:
         .join(BankConnection, BankConnection.id == Account.connection_id)
         .where(BankConnection.household_id == household_id, Transaction.date >= start)
     )
-    return Decimal(result.scalar_one())
+    return quantize_money(Decimal(result.scalar_one()))
 
 
 async def category_spend_map(
@@ -79,12 +80,13 @@ async def generate_plan(db: AsyncSession, goal: Goal) -> Plan:
     categories = {
         c.slug: c for c in (await db.execute(select(Category))).scalars()
     }
+    needed = format_money(projection.monthly_needed)
     summary = (
-        f"Need ${projection.monthly_needed}/month. "
+        f"Need {needed}/month. "
         + (
             "On track with current surplus."
             if projection.on_track
-            else f"Shortfall of ${projection.gap}/month - suggested cuts below."
+            else f"Shortfall of {format_money(projection.gap)}/month - suggested cuts below."
         )
     )
     plan = Plan(
@@ -112,7 +114,7 @@ async def generate_plan(db: AsyncSession, goal: Goal) -> Plan:
                 plan_id=plan.id,
                 action="save",
                 amount=projection.monthly_needed,
-                rationale=f"Set aside ${projection.monthly_needed} each month toward {goal.name}",
+                rationale=f"Set aside {needed} each month toward {goal.name}",
             )
         )
     await db.commit()

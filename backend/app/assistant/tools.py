@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.budgets import service as budget_service
+from app.core.money import quantize_money
 from app.metrics import service as metrics_service
 from app.planner import service as planner_service
 from app.planner.engine import simulate_scenario
@@ -56,7 +57,7 @@ TOOL_SPECS: list[dict[str, Any]] = [
 def _json(data: Any) -> str:
     def default(o: Any) -> Any:
         if isinstance(o, Decimal):
-            return str(o)
+            return str(quantize_money(o))
         if isinstance(o, uuid.UUID):
             return str(o)
         if hasattr(o, "isoformat"):
