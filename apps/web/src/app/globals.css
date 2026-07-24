@@ -1697,8 +1697,9 @@ textarea:-webkit-autofill:focus {
   display: grid;
   place-items: center;
   width: 100%;
-  min-height: min(56vh, 460px);
+  min-height: unset;
   justify-self: stretch;
+  padding: 8px 0;
 }
 
 .landing-hero-ambient {
@@ -1762,7 +1763,16 @@ textarea:-webkit-autofill:focus {
   position: relative;
   z-index: 1;
   width: min(100%, 420px);
-  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.landing-hero-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 20px;
 }
 
 .landing-hero-float {
@@ -1790,7 +1800,7 @@ textarea:-webkit-autofill:focus {
 }
 
 .landing-hero-soft-label {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1799,11 +1809,9 @@ textarea:-webkit-autofill:focus {
 }
 
 .landing-hero-balance-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: min(100%, 260px);
-  padding: 18px 4px;
+  position: relative;
+  min-width: 0;
+  padding: 4px 2px 0;
 }
 
 .landing-hero-balance-amount {
@@ -1838,20 +1846,19 @@ textarea:-webkit-autofill:focus {
 }
 
 .landing-hero-balance-meta {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   font-size: 0.82rem;
   font-weight: 600;
   color: rgba(243, 241, 234, 0.48);
 }
 
 .landing-hero-ring-wrap {
-  position: absolute;
-  top: 8px;
-  right: 0;
+  position: relative;
   width: 118px;
   height: 118px;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .landing-hero-ring {
@@ -1922,12 +1929,9 @@ textarea:-webkit-autofill:focus {
 }
 
 .landing-hero-feed {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   width: 100%;
-  padding: 4px 2px;
+  padding: 0 2px;
 }
 
 .landing-hero-feed-list {
@@ -1936,6 +1940,7 @@ textarea:-webkit-autofill:focus {
   padding: 0;
   display: grid;
   gap: 0;
+  overflow: hidden;
 }
 
 .landing-hero-feed-item {
@@ -1954,7 +1959,7 @@ textarea:-webkit-autofill:focus {
 
 .landing-hero-feed-item:first-child {
   border-top: none;
-  padding-top: 2px;
+  padding-top: 0;
 }
 
 .landing-hero-feed-name {
@@ -2326,13 +2331,13 @@ textarea:-webkit-autofill:focus {
 
   .landing-scene--hero {
     order: -1;
-    min-height: min(42vh, 340px);
+    min-height: unset;
   }
 
   .landing-hero-stage {
-    min-height: 300px;
     width: min(100%, 360px);
     margin: 0 auto;
+    gap: 28px;
   }
 
   .landing-block,
@@ -2363,11 +2368,11 @@ textarea:-webkit-autofill:focus {
   }
 
   .landing-scene--hero {
-    min-height: min(38vh, 300px);
+    min-height: unset;
   }
 
   .landing-hero-stage {
-    min-height: 280px;
+    gap: 24px;
   }
 
   .landing-hero-ring-wrap {

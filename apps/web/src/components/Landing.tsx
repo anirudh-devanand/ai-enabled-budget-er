@@ -21,24 +21,26 @@ function HeroScene() {
       </div>
 
       <div className="landing-hero-stage">
-        <div className="landing-hero-balance-card landing-hero-float">
-          <p className="landing-hero-soft-label">Available</p>
-          <p className="landing-hero-balance-amount">
-            <span className="landing-hero-balance-currency">$</span>
-            <span className="landing-hero-balance-digits">12,480</span>
-            <span className="landing-hero-balance-cents">.60</span>
-          </p>
-          <p className="landing-hero-balance-meta">Across 3 accounts · synced</p>
-        </div>
+        <div className="landing-hero-top">
+          <div className="landing-hero-balance-card landing-hero-float">
+            <p className="landing-hero-soft-label">Available</p>
+            <p className="landing-hero-balance-amount">
+              <span className="landing-hero-balance-currency">$</span>
+              <span className="landing-hero-balance-digits">12,480</span>
+              <span className="landing-hero-balance-cents">.60</span>
+            </p>
+            <p className="landing-hero-balance-meta">Across 3 accounts · synced</p>
+          </div>
 
-        <div className="landing-hero-ring-wrap landing-hero-float landing-hero-float--delay">
-          <svg className="landing-hero-ring" viewBox="0 0 120 120">
-            <circle className="landing-hero-ring-track" cx="60" cy="60" r="48" />
-            <circle className="landing-hero-ring-progress" cx="60" cy="60" r="48" />
-          </svg>
-          <div className="landing-hero-ring-center">
-            <span className="landing-hero-ring-pct">62%</span>
-            <span className="landing-hero-ring-caption">budget left</span>
+          <div className="landing-hero-ring-wrap landing-hero-float landing-hero-float--delay">
+            <svg className="landing-hero-ring" viewBox="0 0 120 120">
+              <circle className="landing-hero-ring-track" cx="60" cy="60" r="48" />
+              <circle className="landing-hero-ring-progress" cx="60" cy="60" r="48" />
+            </svg>
+            <div className="landing-hero-ring-center">
+              <span className="landing-hero-ring-pct">62%</span>
+              <span className="landing-hero-ring-caption">budget left</span>
+            </div>
           </div>
         </div>
 
