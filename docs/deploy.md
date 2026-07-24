@@ -15,7 +15,10 @@ Env prefix is **`WONEY_`**. Legacy **`LEDGER_*`** names still work until you mig
    exactly to stay managed (see [hosting-rename.md](hosting-rename.md) if you renamed in UI first).
 4. Set these secrets when prompted (or after create):
    - `WONEY_DATA_ENCRYPTION_KEY` — `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-   - `WONEY_CORS_ORIGINS` — your Vercel URL(s), e.g. `https://woney-web-blue.vercel.app` (include the old `ledger-web-*` origin during rename)
+   - `WONEY_CORS_ORIGINS` — your Vercel URL(s), e.g. `https://woneyai.vercel.app,https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app`
+   - `WONEY_OAUTH_REDIRECT_URI` — `https://woneyai.vercel.app/login/oauth/callback` (also add this URI in Google Cloud Console)
+   - `WONEY_PUBLIC_APP_URL` — `https://woneyai.vercel.app` (password-reset email links)
+   - `WONEY_RESEND_API_KEY` + `WONEY_EMAIL_FROM` — optional; needed for real password-reset / deletion emails
 5. Render generates `WONEY_JWT_SECRET` and `WONEY_OPS_TOKEN`. Existing service env vars
    (including legacy `LEDGER_*`) keep working even if Blueprint briefly shows unmanaged.
 6. **Important:** Render Postgres connection strings use `postgres://`; the Docker entrypoint

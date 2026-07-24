@@ -247,6 +247,21 @@ export class WoneyClient {
     return this.request<{ providers: OAuthProvider[] }>("GET", "/v1/auth/oauth/providers");
   }
 
+  requestPasswordReset(email: string) {
+    return this.request<{
+      message: string;
+      delivery: string;
+      dev_reset_url?: string | null;
+    }>("POST", "/v1/auth/password-reset/request", { email });
+  }
+
+  confirmPasswordReset(token: string, password: string) {
+    return this.request<void>("POST", "/v1/auth/password-reset/confirm", {
+      token,
+      password,
+    });
+  }
+
   async loginWithGoogleCode(code: string, redirectUri?: string) {
     return this.loginWithOAuthCode("google", code, redirectUri);
   }

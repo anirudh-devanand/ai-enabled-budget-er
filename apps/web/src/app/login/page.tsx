@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, isMfaChallenge, type OAuthProvider } from "@woney/api-client";
+import { isMfaChallenge, type OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
 import { SsoButtons } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
+import { authErrorMessage } from "@/lib/errors";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,9 +18,19 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
+  const [ssoNote, setSsoNote] = useState<string | null>(null);
 
   useEffect(() => {
-    api.listOAuthProviders().then((r) => setProviders(r.providers)).catch(() => undefined);
+    api
+      .listOAuthProviders()
+      .then((r) => {
+        setProviders(r.providers);
+        setSsoNote(null);
+      })
+      .catch(() => {
+        setProviders([]);
+        setSsoNote("Sign-in providers unavailable — check your connection and try again.");
+      });
   }, []);
 
   async function submitLogin(e: React.FormEvent) {
@@ -34,7 +45,7 @@ export default function LoginPage() {
         router.replace("/dashboard");
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Something went wrong");
+      setError(authErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -49,7 +60,7 @@ export default function LoginPage() {
       await api.verifyMfa(challengeToken, code);
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Something went wrong");
+      setError(authErrorMessage(err, "Could not verify code."));
     } finally {
       setBusy(false);
     }
@@ -92,6 +103,7 @@ export default function LoginPage() {
             ) : (
               <>
                 <SsoButtons providers={providers} />
+                {ssoNote && !providers.length && <p className="muted">{ssoNote}</p>}
                 <form onSubmit={submitLogin}>
                   <div className="field">
                     <label htmlFor="email">Email</label>
@@ -119,6 +131,9 @@ export default function LoginPage() {
                       required
                     />
                   </div>
+                  <p className="alt" style={{ marginTop: "-0.35rem", marginBottom: "0.85rem" }}>
+                    <Link href="/forgot-password">Forgot password?</Link>
+                  </p>
                   <button className="btn btn-primary btn-block" disabled={busy}>
                     {busy ? "Signing in…" : "Sign in"}
                   </button>

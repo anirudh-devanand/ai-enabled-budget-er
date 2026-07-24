@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ApiError, isMfaChallenge } from "@woney/api-client";
+import { isMfaChallenge } from "@woney/api-client";
 import { readOAuthProvider } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
+import { authErrorMessage } from "@/lib/errors";
 
 function OAuthCallbackInner() {
   const router = useRouter();
@@ -28,7 +29,7 @@ function OAuthCallbackInner() {
         }
         router.replace("/dashboard");
       } catch (err) {
-        setError(err instanceof ApiError ? err.detail : "Sign-in failed");
+        setError(authErrorMessage(err, "Sign-in failed"));
       }
     })();
   }, [params, router]);

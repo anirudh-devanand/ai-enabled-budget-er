@@ -6,12 +6,48 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 import jwt
+from fastapi import Request
 
 from app.core.config import Settings
+
+
+def origin_from_request(request: Request) -> str | None:
+    """Browser Origin header, or scheme+host from Referer."""
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    if origin:
+        return origin
+    referer = (request.headers.get("referer") or "").strip()
+    if not referer:
+        return None
+    parsed = urlparse(referer)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def resolve_oauth_redirect_uri(settings: Settings, request: Request | None = None) -> str:
+    """Prefer the caller's origin callback when that origin is CORS-allowed."""
+    if request is not None:
+        origin = origin_from_request(request)
+        if origin and origin in settings.cors_origin_list():
+            return f"{origin}/login/oauth/callback"
+    return settings.oauth_redirect_uri
+
+
+def is_allowed_oauth_redirect(settings: Settings, redirect_uri: str) -> bool:
+    """True when redirect_uri is the configured default or a CORS origin callback."""
+    cleaned = redirect_uri.strip()
+    if cleaned == settings.oauth_redirect_uri:
+        return True
+    suffix = "/login/oauth/callback"
+    if not cleaned.endswith(suffix):
+        return False
+    origin = cleaned[: -len(suffix)].rstrip("/")
+    return origin in settings.cors_origin_list()
 
 
 @dataclass

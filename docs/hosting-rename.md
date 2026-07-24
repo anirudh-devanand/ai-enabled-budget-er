@@ -57,8 +57,11 @@ become orphaned from the Blueprint (still running, but not Blueprint-managed).
    - Env vars — either leave `LEDGER_*` (still works) or duplicate then switch:
    - Add `WONEY_ENV`, `WONEY_DATABASE_URL`, `WONEY_JWT_SECRET`, `WONEY_DATA_ENCRYPTION_KEY`, `WONEY_OPS_TOKEN`, `WONEY_CORS_ORIGINS`, plus any `WONEY_PLAID_*` / `WONEY_*_OAUTH_*` / `WONEY_LLM_API_KEY` / `WONEY_RESEND_*` you use.
    - Copy values from the matching `LEDGER_*` keys (do not regenerate JWT/Fernet unless you intend to invalidate sessions / re-encrypt TOTP).
-   - Set `WONEY_CORS_ORIGINS` to include **both** web origins during cutover, e.g.  
-     `https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app`
+   - Set `WONEY_CORS_ORIGINS` to include **all** live web origins during cutover, e.g.  
+     `https://woneyai.vercel.app,https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app`  
+     (API code also merges these known hosts so a stale Render env cannot hide SSO.)
+   - Set `WONEY_OAUTH_REDIRECT_URI` / Google Console redirect to  
+     `https://woneyai.vercel.app/login/oauth/callback` (providers endpoint prefers request Origin when allowed).
    - After clients point only at Woney hosts, remove the old origin and delete unused `LEDGER_*` keys.
 4. Confirm `GET https://<actual-api-host>/healthz` → `status: ok`, `database: up`.
 

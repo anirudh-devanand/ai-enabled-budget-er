@@ -64,3 +64,19 @@ class SessionInfo(BaseModel):
     user_agent: str | None
     created_at: datetime
     expires_at: datetime
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequestResponse(BaseModel):
+    message: str
+    delivery: str = "none"  # email | dev_log | none
+    # Only set in non-production when Resend is not configured (never in prod).
+    dev_reset_url: str | None = None
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=256)
+    password: str = Field(min_length=10, max_length=128)

@@ -27,6 +27,32 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def password_strength_ok(password: str) -> bool:
+    """Match web register rules: length 10+ and at least 3 of 4 checks (score >= 3)."""
+    if len(password) < 10 or len(password) > 128:
+        return False
+    passed = sum(
+        [
+            len(password) >= 10,
+            any(c.isupper() for c in password),
+            any(c.islower() for c in password),
+            any(c.isdigit() for c in password) or any(not c.isalnum() for c in password),
+        ]
+    )
+    return passed >= 3
+
+
+def assert_password_strength(password: str) -> None:
+    from fastapi import HTTPException, status
+
+    if not password_strength_ok(password):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Password is too weak. Use at least 10 characters with a mix of "
+            "upper/lowercase and a number or symbol.",
+        )
+
+
 def create_access_token(user_id: uuid.UUID) -> str:
     settings = get_settings()
     payload = {

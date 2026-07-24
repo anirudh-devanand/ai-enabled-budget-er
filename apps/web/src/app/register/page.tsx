@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, type OAuthProvider } from "@woney/api-client";
+import type { OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
 import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
+import { authErrorMessage } from "@/lib/errors";
 import { passwordScore } from "@/lib/ui";
 
 export default function RegisterPage() {
@@ -18,10 +19,20 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
+  const [ssoNote, setSsoNote] = useState<string | null>(null);
   const strength = useMemo(() => passwordScore(password), [password]);
 
   useEffect(() => {
-    api.listOAuthProviders().then((r) => setProviders(r.providers)).catch(() => undefined);
+    api
+      .listOAuthProviders()
+      .then((r) => {
+        setProviders(r.providers);
+        setSsoNote(null);
+      })
+      .catch(() => {
+        setProviders([]);
+        setSsoNote("Sign-in providers unavailable — check your connection and try again.");
+      });
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -37,7 +48,7 @@ export default function RegisterPage() {
       await api.login(email, password);
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Something went wrong");
+      setError(authErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -56,6 +67,7 @@ export default function RegisterPage() {
             <h1>Create your account</h1>
             <p className="sub">Takes about a minute — or continue with SSO.</p>
             <SsoButtons providers={providers} />
+            {ssoNote && !providers.length && <p className="muted">{ssoNote}</p>}
             <form onSubmit={submit}>
               <div className="field">
                 <label htmlFor="name">Full name</label>

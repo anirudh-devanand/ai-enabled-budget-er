@@ -72,6 +72,7 @@ async def healthz() -> dict:
         "apple_oauth_configured": s.apple_oauth_configured,
         "microsoft_oauth_configured": s.microsoft_oauth_configured,
         "llm_configured": bool(s.llm_api_key),
+        "email_configured": bool(s.resend_api_key and s.email_from),
     }
     try:
         async with get_engine().connect() as conn:

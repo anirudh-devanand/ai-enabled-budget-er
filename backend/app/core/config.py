@@ -47,10 +47,17 @@ class Settings(BaseSettings):
 
     # Comma-separated browser origins allowed for CORS (empty = allow all in development).
     # Includes both new and legacy Vercel hosts during the Ledger → Woney rename.
+    # Known product hosts are always merged in cors_origin_list() so a stale Render
+    # WONEY_CORS_ORIGINS cannot hide SSO / break register after a domain cutover.
     cors_origins: str = (
         "http://localhost:3000,http://127.0.0.1:3000,"
+        "https://woneyai.vercel.app,"
         "https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app"
     )
+
+    # Public web origin for password-reset email links (no path). Falls back to
+    # the origin of oauth_redirect_uri when unset.
+    public_app_url: str | None = None
 
     # Shared secret for cron/batch ops (X-Ops-Token). Required in production for /v1/ops/*.
     ops_token: str | None = None
@@ -113,6 +120,7 @@ class Settings(BaseSettings):
         "flinks_auth_key",
         "resend_api_key",
         "email_from",
+        "public_app_url",
         mode="before",
     )
     @classmethod
@@ -128,7 +136,26 @@ class Settings(BaseSettings):
         return value
 
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        configured = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # Always allow known cutover hosts even when Render env lags.
+        known = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "https://woneyai.vercel.app",
+            "https://woney-web-blue.vercel.app",
+            "https://ledger-web-blue.vercel.app",
+        ]
+        return list(dict.fromkeys([*configured, *known]))
+
+    def resolved_public_app_url(self) -> str:
+        if self.public_app_url:
+            return self.public_app_url.rstrip("/")
+        # Derive from OAuth callback, e.g. https://host/login/oauth/callback → https://host
+        redirect = (self.oauth_redirect_uri or "").rstrip("/")
+        suffix = "/login/oauth/callback"
+        if redirect.endswith(suffix):
+            return redirect[: -len(suffix)]
+        return "https://woneyai.vercel.app"
 
     @property
     def plaid_configured(self) -> bool:

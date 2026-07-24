@@ -14,6 +14,9 @@ from app.auth.schemas import (
     MfaEnrollResponse,
     MfaRecoveryCodesResponse,
     MfaVerifyRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    PasswordResetRequestResponse,
     RefreshRequest,
     RegisterRequest,
     TokenPair,
@@ -22,6 +25,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.security import (
     MFA_CHALLENGE_TOKEN,
+    assert_password_strength,
     create_mfa_challenge_token,
     decode_token,
     hash_password,
@@ -39,9 +43,13 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: DbDep) -> User:
+    assert_password_strength(body.password)
     existing = await db.execute(select(User).where(User.email == body.email.lower()))
     if existing.scalar_one_or_none() is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "An account with this email already exists. Sign in or reset your password.",
+        )
     user = User(
         email=body.email.lower(),
         password_hash=hash_password(body.password),
@@ -132,12 +140,29 @@ async def regenerate_recovery_codes(user: CurrentUser, db: DbDep) -> MfaRecovery
     return MfaRecoveryCodesResponse(recovery_codes=codes)
 
 
+@router.post("/password-reset/request", response_model=PasswordResetRequestResponse)
+async def password_reset_request(
+    body: PasswordResetRequest, db: DbDep, request: Request
+) -> PasswordResetRequestResponse:
+    from app.auth.password_reset import request_password_reset
+
+    return await request_password_reset(db, body.email, request)
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
+async def password_reset_confirm(body: PasswordResetConfirmRequest, db: DbDep) -> None:
+    from app.auth.password_reset import confirm_password_reset
+
+    await confirm_password_reset(db, body)
+
+
 @router.get("/oauth/providers")
-async def oauth_providers():
-    from app.auth.oauth import configured_providers
+async def oauth_providers(request: Request):
+    from app.auth.oauth import configured_providers, resolve_oauth_redirect_uri
     from app.core.config import get_settings
 
     settings = get_settings()
+    redirect_uri = resolve_oauth_redirect_uri(settings, request)
     return {
         "providers": [
             {
@@ -146,7 +171,7 @@ async def oauth_providers():
                 "enabled": p.enabled,
                 "auth_url": p.auth_url,
             }
-            for p in configured_providers(settings, settings.oauth_redirect_uri)
+            for p in configured_providers(settings, redirect_uri)
         ]
     }
 
@@ -207,7 +232,11 @@ async def oauth_provider_callback(
     if not code or not isinstance(code, str):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing code")
     settings = get_settings()
-    redirect_uri = body.get("redirect_uri") or settings.oauth_redirect_uri
+    from app.auth.oauth import is_allowed_oauth_redirect, resolve_oauth_redirect_uri
+
+    redirect_uri = body.get("redirect_uri") or resolve_oauth_redirect_uri(settings, request)
+    if not isinstance(redirect_uri, str) or not is_allowed_oauth_redirect(settings, redirect_uri):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid redirect_uri")
     try:
         profile = await exchangers[provider](settings, code, redirect_uri)
     except Exception as exc:
