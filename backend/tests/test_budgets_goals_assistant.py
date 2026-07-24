@@ -150,3 +150,31 @@ async def test_assistant_offline_chat(client, register_payload):
     content = msg.json()["content"]
     assert "net worth" in content.lower() or "spending" in content.lower()
     assert "{" not in content  # no raw JSON dump
+
+
+async def test_assistant_llm_failure_falls_back(client, register_payload, monkeypatch):
+    """Broken LLM key/provider must still return 200 via offline reply."""
+    from app.assistant import service as assistant_service
+
+    class BoomLlm:
+        async def complete(self, messages, tools=None, temperature=0.2):
+            raise RuntimeError("anthropic 401 invalid x-api-key")
+
+    monkeypatch.setattr(assistant_service, "get_llm_client", lambda: BoomLlm())
+
+    headers, household_id = await _setup(client, register_payload)
+    convo = await client.post(
+        "/v1/assistant/conversations",
+        json={"household_id": household_id},
+        headers=headers,
+    )
+    assert convo.status_code == 201
+    cid = convo.json()["id"]
+    msg = await client.post(
+        f"/v1/assistant/conversations/{cid}/messages",
+        json={"message": "How much did I spend on dining lately?"},
+        headers=headers,
+    )
+    assert msg.status_code == 200, msg.text
+    assert msg.json()["role"] == "assistant"
+    assert len(msg.json()["content"]) > 0

@@ -57,7 +57,13 @@ async def send_message(
     convo = await service.get_conversation_for_user(db, conversation_id, user.id)
     if convo is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
-    return await service.chat(db, convo, body.message)
+    try:
+        return await service.chat(db, convo, body.message)
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Assistant could not reply: {exc}",
+        ) from exc
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageResponse])

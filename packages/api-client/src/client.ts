@@ -33,6 +33,41 @@ export class ApiError extends Error {
   }
 }
 
+/** Normalize FastAPI / proxy error bodies into a single readable string. */
+export function formatApiDetail(data: unknown, fallback: string): string {
+  if (data == null) return fallback || "Request failed";
+  if (typeof data === "string") {
+    const trimmed = data.trim();
+    return trimmed || fallback || "Request failed";
+  }
+  if (typeof data !== "object") return fallback || "Request failed";
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object" && "msg" in item) {
+        const loc = Array.isArray((item as { loc?: unknown }).loc)
+          ? (item as { loc: unknown[] }).loc.join(".")
+          : "";
+        const msg = String((item as { msg: unknown }).msg);
+        return loc ? `${loc}: ${msg}` : msg;
+      }
+      return JSON.stringify(item);
+    });
+    const joined = parts.filter(Boolean).join("; ");
+    if (joined) return joined;
+  }
+  if (detail != null) {
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      /* ignore */
+    }
+  }
+  return fallback || "Request failed";
+}
+
 export interface TokenStorage {
   getAccessToken(): string | null;
   getRefreshToken(): string | null;
@@ -88,10 +123,10 @@ export class LedgerClient {
       if (refreshed) return this.request<T>(method, path, body, { ...opts, retried: true });
     }
     if (!resp.ok) {
-      let detail = resp.statusText;
+      let detail = resp.statusText || `HTTP ${resp.status}`;
       try {
         const data = await resp.json();
-        if (typeof data.detail === "string") detail = data.detail;
+        detail = formatApiDetail(data, detail);
       } catch {
         // non-JSON error body
       }
@@ -286,10 +321,10 @@ export class LedgerClient {
       if (refreshed) return this.importCsvStatement(input);
     }
     if (!resp.ok) {
-      let detail = resp.statusText;
+      let detail = resp.statusText || `HTTP ${resp.status}`;
       try {
         const data = await resp.json();
-        if (typeof data.detail === "string") detail = data.detail;
+        detail = formatApiDetail(data, detail);
       } catch {
         // ignore
       }

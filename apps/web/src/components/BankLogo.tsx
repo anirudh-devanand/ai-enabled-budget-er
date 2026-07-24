@@ -4,7 +4,6 @@ import { useState } from "react";
 
 type BankMeta = {
   label: string;
-  domain: string | null;
   localSrc: string | null;
   bg: string;
 };
@@ -12,39 +11,34 @@ type BankMeta = {
 function matchBank(name: string | null | undefined): BankMeta {
   const n = (name || "").toLowerCase();
   if (n.includes("toronto-dominion") || n.includes("td bank") || /\btd\b/.test(n)) {
-    return { label: "TD", domain: "td.com", localSrc: "/banks/td.png", bg: "#34A853" };
+    return { label: "TD", localSrc: "/banks/td.png", bg: "#34A853" };
   }
   if (n.includes("royal bank") || n.includes("rbc")) {
-    return { label: "RBC", domain: "rbcroyalbank.com", localSrc: "/banks/rbc.png", bg: "#0051A5" };
+    return { label: "RBC", localSrc: "/banks/rbc.png", bg: "#0051A5" };
   }
   if (n.includes("scotia")) {
-    return { label: "Scotia", domain: "scotiabank.com", localSrc: "/banks/scotia.png", bg: "#EC111A" };
+    return { label: "Scotia", localSrc: "/banks/scotia.png", bg: "#EC111A" };
   }
   if (n.includes("bank of montreal") || /\bbmo\b/.test(n)) {
-    return { label: "BMO", domain: "bmo.com", localSrc: "/banks/bmo.png", bg: "#0079C1" };
+    return { label: "BMO", localSrc: "/banks/bmo.png", bg: "#0079C1" };
   }
   if (n.includes("cibc") || n.includes("canadian imperial")) {
-    return { label: "CIBC", domain: "cibc.com", localSrc: "/banks/cibc.png", bg: "#C41F3E" };
+    return { label: "CIBC", localSrc: "/banks/cibc.png", bg: "#C41F3E" };
   }
   if (n.includes("eq bank") || n.includes("equitable")) {
-    return { label: "EQ", domain: "eqbank.ca", localSrc: "/banks/eq.png", bg: "#111111" };
+    return { label: "EQ", localSrc: "/banks/eq.png", bg: "#111111" };
   }
   if (n.includes("wealthsimple")) {
-    return {
-      label: "WS",
-      domain: "wealthsimple.com",
-      localSrc: "/banks/wealthsimple.png",
-      bg: "#1C1C1C",
-    };
+    return { label: "WS", localSrc: "/banks/wealthsimple.png", bg: "#1C1C1C" };
   }
   if (n.includes("neo")) {
-    return { label: "Neo", domain: "neofinancial.com", localSrc: "/banks/neo.png", bg: "#0B0B0B" };
+    return { label: "Neo", localSrc: "/banks/neo.png", bg: "#0B0B0B" };
   }
   if (n.includes("plaid") || n.includes("first platypus") || n.includes("chase")) {
-    return { label: "Plaid", domain: "plaid.com", localSrc: "/banks/plaid.png", bg: "#0A85EA" };
+    return { label: "Plaid", localSrc: "/banks/plaid.png", bg: "#0A85EA" };
   }
   if (n.includes("csv") || n.includes("import")) {
-    return { label: "CSV", domain: null, localSrc: null, bg: "#2a2a2a" };
+    return { label: "CSV", localSrc: null, bg: "#2a2a2a" };
   }
   const initials = (name || "Bank")
     .split(/\s+/)
@@ -52,11 +46,7 @@ function matchBank(name: string | null | undefined): BankMeta {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
-  return { label: initials || "BK", domain: null, localSrc: null, bg: "#2a2a2a" };
-}
-
-function remoteLogo(domain: string) {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+  return { label: initials || "BK", localSrc: null, bg: "#2a2a2a" };
 }
 
 export function BankLogo({
@@ -67,13 +57,7 @@ export function BankLogo({
   size?: number;
 }) {
   const meta = matchBank(institutionName);
-  const candidates = [
-    meta.domain ? remoteLogo(meta.domain) : null,
-    meta.localSrc,
-  ].filter(Boolean) as string[];
-  const [idx, setIdx] = useState(0);
-  const src = candidates[idx] ?? null;
-  const failed = !src || idx >= candidates.length;
+  const [failed, setFailed] = useState(!meta.localSrc);
 
   return (
     <div
@@ -81,21 +65,22 @@ export function BankLogo({
       style={{
         width: size,
         height: size,
-        background: failed ? meta.bg : "#fff",
+        // Never paint a white/canvas plate behind the mark — only fallback tint when image fails.
+        background: failed ? meta.bg : "transparent",
         color: "#fff",
       }}
       title={institutionName || meta.label}
       aria-hidden
     >
-      {!failed && src ? (
+      {!failed && meta.localSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={meta.localSrc}
           alt=""
-          width={Math.round(size * 0.62)}
-          height={Math.round(size * 0.62)}
-          style={{ objectFit: "contain" }}
-          onError={() => setIdx((i) => i + 1)}
+          width={size}
+          height={size}
+          style={{ objectFit: "contain", width: "100%", height: "100%", background: "transparent" }}
+          onError={() => setFailed(true)}
         />
       ) : (
         <span style={{ fontSize: size * 0.32, fontWeight: 800 }}>{meta.label}</span>

@@ -1,15 +1,16 @@
+import logging
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assistant.models import Conversation, Message
+from app.assistant.offline import format_offline_reply
 from app.assistant.tools import TOOL_SPECS, run_tool
 from app.connections.service import user_in_household
 from app.core.llm import LlmClient, LlmMessage, NullLlmClient, get_llm_client
 
-
-from app.assistant.offline import format_offline_reply
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are Woney, a personal finance assistant. Answer using tools that read the "
@@ -50,6 +51,22 @@ async def list_messages(db: AsyncSession, conversation_id: uuid.UUID) -> list[Me
     return list(result.scalars().all())
 
 
+async def _offline_reply(
+    db: AsyncSession, conversation: Conversation, user_text: str
+) -> Message:
+    """Deterministic tool-backed answer when no LLM key or the LLM call fails."""
+    spending = await run_tool(db, conversation.household_id, "get_spending_summary", {})
+    net = await run_tool(db, conversation.household_id, "get_net_worth", {})
+    reply = format_offline_reply(user_text, spending, net)
+    assistant = Message(
+        conversation_id=conversation.id, role="assistant", content=reply
+    )
+    db.add(assistant)
+    await db.commit()
+    await db.refresh(assistant)
+    return assistant
+
+
 async def chat(
     db: AsyncSession,
     conversation: Conversation,
@@ -69,57 +86,55 @@ async def chat(
 
     # Offline / no-key path: deterministic tool-backed natural language answer.
     if isinstance(llm, NullLlmClient):
-        spending = await run_tool(db, conversation.household_id, "get_spending_summary", {})
-        net = await run_tool(db, conversation.household_id, "get_net_worth", {})
-        reply = format_offline_reply(user_text, spending, net)
+        return await _offline_reply(db, conversation, user_text)
+
+    # Tool loop (max 4 rounds). Any LLM failure falls back so Send never 500s.
+    try:
+        for _ in range(4):
+            response = await llm.complete(messages, tools=TOOL_SPECS)
+            if response.tool_calls:
+                for call in response.tool_calls:
+                    result = await run_tool(
+                        db, conversation.household_id, call.name, call.arguments
+                    )
+                    db.add(
+                        Message(
+                            conversation_id=conversation.id,
+                            role="tool",
+                            content=result,
+                            tool_name=call.name,
+                        )
+                    )
+                    messages.append(
+                        LlmMessage(
+                            role="tool",
+                            content=result,
+                            tool_call_id=call.id,
+                            name=call.name,
+                        )
+                    )
+                continue
+            content = response.content or "I couldn't generate a response."
+            assistant = Message(
+                conversation_id=conversation.id, role="assistant", content=content
+            )
+            db.add(assistant)
+            await db.commit()
+            await db.refresh(assistant)
+            return assistant
+
         assistant = Message(
-            conversation_id=conversation.id, role="assistant", content=reply
+            conversation_id=conversation.id,
+            role="assistant",
+            content="I hit the tool-call limit. Try a more specific question.",
         )
         db.add(assistant)
         await db.commit()
         await db.refresh(assistant)
         return assistant
-
-    # Tool loop (max 4 rounds).
-    for _ in range(4):
-        response = await llm.complete(messages, tools=TOOL_SPECS)
-        if response.tool_calls:
-            for call in response.tool_calls:
-                result = await run_tool(
-                    db, conversation.household_id, call.name, call.arguments
-                )
-                db.add(
-                    Message(
-                        conversation_id=conversation.id,
-                        role="tool",
-                        content=result,
-                        tool_name=call.name,
-                    )
-                )
-                messages.append(
-                    LlmMessage(
-                        role="tool",
-                        content=result,
-                        tool_call_id=call.id,
-                        name=call.name,
-                    )
-                )
-            continue
-        content = response.content or "I couldn't generate a response."
-        assistant = Message(
-            conversation_id=conversation.id, role="assistant", content=content
+    except Exception:
+        logger.exception(
+            "LLM assistant chat failed; falling back to offline reply for conversation %s",
+            conversation.id,
         )
-        db.add(assistant)
-        await db.commit()
-        await db.refresh(assistant)
-        return assistant
-
-    assistant = Message(
-        conversation_id=conversation.id,
-        role="assistant",
-        content="I hit the tool-call limit. Try a more specific question.",
-    )
-    db.add(assistant)
-    await db.commit()
-    await db.refresh(assistant)
-    return assistant
+        return await _offline_reply(db, conversation, user_text)

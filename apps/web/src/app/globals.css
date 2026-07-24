@@ -95,30 +95,31 @@ textarea {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 32px 20px;
+  padding: clamp(16px, 3vw, 32px) clamp(12px, 2.5vw, 20px);
   box-sizing: border-box;
 }
 
 .auth-shell {
-  position: relative;
-  width: min(940px, 100%);
-  /* Leave room for brand + gap; form defines height */
-  padding-left: calc(42% + 18px);
+  display: grid;
+  /* Flexible split ? hard mins live in the stacked breakpoint, not here */
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+  gap: clamp(14px, 2vw, 20px);
+  width: min(980px, 100%);
+  align-items: stretch;
   box-sizing: border-box;
 }
 
 .auth-brand {
-  padding: 36px;
+  padding: clamp(24px, 3vw, 36px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   color: #f7fbf8;
   background: linear-gradient(160deg, #1c1c1c 0%, #242424 55%, #2a2a2a 100%);
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 42%;
+  position: relative;
+  width: auto;
+  min-width: 0;
+  min-height: 100%;
   overflow: hidden;
   border-radius: 24px;
   box-sizing: border-box;
@@ -161,18 +162,23 @@ textarea {
   position: relative;
   z-index: 1;
   width: 100%;
+  min-width: 0;
   padding: 0;
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 
 .auth-card {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
   background: #ffffff;
   color: #141414;
   border: 1px solid #e8e8e4;
   border-radius: 24px;
   box-shadow: var(--shadow);
-  padding: 36px 32px;
+  padding: clamp(24px, 3.5vw, 36px) clamp(18px, 3vw, 32px);
   box-sizing: border-box;
 }
 
@@ -270,25 +276,32 @@ textarea {
   font-size: 0.95rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .auth-shell {
-    padding-left: 0;
-    width: min(440px, 100%);
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    width: min(460px, 100%);
     gap: 16px;
   }
   .auth-brand {
-    position: relative;
     width: 100%;
-    min-height: 200px;
-    border-radius: 24px;
+    min-height: 180px;
   }
-  .auth-panel {
+  .auth-panel,
+  .auth-card {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-shell {
     width: 100%;
   }
   .auth-card {
-    border-radius: 24px;
+    padding: 22px 16px;
+  }
+  .sso-btn {
+    padding: 11px 12px;
+    font-size: 0.92rem;
   }
 }
 
@@ -304,17 +317,30 @@ textarea {
   margin-bottom: 6px;
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   width: 100%;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.field input:focus {
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  opacity: 1;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   outline: none;
   border-color: var(--border-strong);
   box-shadow: none;
@@ -439,8 +465,9 @@ textarea {
 /* ??? App shell ??? */
 .app-frame {
   min-height: 100vh;
+  width: 100%;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
 }
 
 .app-nav {
@@ -453,6 +480,7 @@ textarea {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .app-nav .brand {
@@ -486,8 +514,10 @@ textarea {
   text-decoration: none;
   font-weight: 600;
   font-size: 0.92rem;
+  border: none;
   border-bottom: none;
-  border-left: 2px solid transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .app-nav a.nav-link:hover {
@@ -500,7 +530,14 @@ textarea {
 .app-nav a.nav-link.active {
   background: var(--surface-muted);
   color: var(--text);
-  border-left-color: var(--text);
+  /* Selected state = muted fill only ? no silver/white left edge */
+  border: none;
+  box-shadow: none;
+}
+
+.app-nav a.nav-link:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .app-nav .nav-footer {
@@ -509,8 +546,24 @@ textarea {
 }
 
 .app-main {
-  padding: 36px 40px 64px;
-  max-width: 1100px;
+  padding: clamp(24px, 3.5vw, 36px) clamp(16px, 3.5vw, 40px) 64px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  overflow-x: clip;
+}
+
+.app-main > * {
+  max-width: 100%;
+}
+
+.hero-balance,
+.list-card,
+.grid,
+.section-title,
+.page-header {
+  width: 100%;
 }
 
 .page-header {
@@ -570,8 +623,10 @@ textarea {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* Fluid columns: expand/contract with main column width */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 16px;
+  width: 100%;
 }
 
 .tile {
@@ -737,7 +792,8 @@ button.account-card {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  color: var(--ink);
+  /* Icons sit on light chip backgrounds in both themes */
+  color: #000;
 }
 
 .cat-glyph {
@@ -798,6 +854,14 @@ button.account-card {
   border-radius: 10px;
   border: 1px solid var(--border-strong);
   background: #fff;
+  color: #141414;
+  -webkit-text-fill-color: #141414;
+  caret-color: #141414;
+}
+
+.filter-bar input::placeholder {
+  color: #8a8a84;
+  -webkit-text-fill-color: #8a8a84;
 }
 
 .tile-link {
@@ -870,13 +934,14 @@ button.account-card {
 }
 
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .app-frame {
     grid-template-columns: 1fr;
   }
   .app-nav {
     position: sticky;
     top: 0;
+    z-index: 20;
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--border);
@@ -884,8 +949,14 @@ button.account-card {
   }
   .app-nav nav {
     flex-direction: row;
+    flex-wrap: nowrap;
     overflow-x: auto;
     gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-nav a.nav-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   .app-nav .brand {
     padding-bottom: 12px;
@@ -898,11 +969,28 @@ button.account-card {
   }
 }
 
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .txn-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
 /* Legacy class aliases used by older pages */
 .shell {
-  max-width: 1100px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 36px 24px 64px;
+  box-sizing: border-box;
 }
 .shell header {
   display: flex;
@@ -955,13 +1043,59 @@ label {
   margin: 14px 0 6px;
   font-weight: 600;
 }
-input {
+/* Theme-aware controls: follow --text/--surface. Do NOT force global black fill
+   (that made dark-theme .field / account inputs unreadable). Light panels that
+   keep a white background opt into black text explicitly below. */
+input,
+select,
+textarea {
   width: 100%;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  opacity: 1;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Explicit light surfaces (always white bg → always dark text) */
+.assistant-composer .assistant-input,
+.assistant-input {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  caret-color: #000;
+}
+
+.assistant-input::placeholder {
+  color: #8a8a84;
+  -webkit-text-fill-color: #8a8a84;
+}
+
+.assistant-input:-webkit-autofill,
+.assistant-input:-webkit-autofill:hover,
+.assistant-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000;
+  caret-color: #000;
 }
 
 /* ??? Woney loader ??? */
@@ -1061,28 +1195,45 @@ input {
 }
 
 .stack input,
-.stack select {
+.stack select,
+.stack textarea {
   font: inherit;
   color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 12px;
 }
 
+.stack input::placeholder,
+.stack textarea::placeholder {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+}
+
 /* Bank logos + account hub */
 .bank-logo {
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: none;
+  background: transparent;
   box-shadow: none;
+  padding: 0;
 }
 
 .bank-logo img {
   display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: transparent;
 }
 
 .bank-row {
@@ -1178,10 +1329,11 @@ input {
 
 .account-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 18px;
   margin-bottom: 28px;
-  max-width: 520px;
+  width: 100%;
+  max-width: none;
 }
 
 @media (max-width: 860px) {
@@ -1207,6 +1359,43 @@ input {
   margin: 0 0 18px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+/* Account profile inputs sit on --surface; follow theme text (not forced black/white). */
+.account-panel .field input,
+.account-panel .field select,
+.account-panel .field textarea,
+.account-panel input,
+.account-panel select,
+.account-panel textarea {
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  background: var(--surface);
+}
+
+.account-panel .field input:disabled,
+.account-panel input:disabled {
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  opacity: 0.85;
+}
+
+.account-panel .field input::placeholder,
+.account-panel input::placeholder {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+}
+
+.account-panel .field input:-webkit-autofill,
+.account-panel .field input:-webkit-autofill:hover,
+.account-panel .field input:-webkit-autofill:focus,
+.account-panel input:-webkit-autofill,
+.account-panel input:-webkit-autofill:hover,
+.account-panel input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 .theme-toggle {

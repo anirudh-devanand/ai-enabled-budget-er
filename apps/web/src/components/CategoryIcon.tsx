@@ -126,7 +126,7 @@ export function CategoryGlyph({
 }) {
   const { key } = categoryMeta(name);
   return (
-    <span className="cat-glyph" style={{ color: "var(--ink)", width: size, height: size }}>
+    <span className="cat-glyph" style={{ color: "#000", width: size, height: size }}>
       {ICONS[key]}
     </span>
   );

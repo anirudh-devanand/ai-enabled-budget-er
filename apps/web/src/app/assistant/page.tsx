@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { MessageResponse } from "@ledger/api-client";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
-import { isUnauthorized } from "@/lib/errors";
+import { getApiDetail, isUnauthorized } from "@/lib/errors";
 
 export default function AssistantPage() {
   const router = useRouter();
@@ -14,6 +14,8 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [input, setInput] = useState("How much did I spend on dining lately?");
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -21,30 +23,53 @@ export default function AssistantPage() {
         const households = await api.listHouseholds();
         const hid = households[0]?.id ?? null;
         setHouseholdId(hid);
-        if (!hid) return;
+        if (!hid) {
+          setError("No household found. Create one before chatting.");
+          return;
+        }
         const convo = await api.createConversation(hid);
         setConversationId(convo.id);
+        setError(null);
       } catch (err) {
-        if (isUnauthorized(err)) router.replace("/login");
+        if (isUnauthorized(err)) {
+          router.replace("/login");
+          return;
+        }
+        setError(getApiDetail(err, "Could not start chat"));
+      } finally {
+        setReady(true);
       }
     })();
   }, [router]);
 
   async function send() {
-    if (!conversationId || !input.trim()) return;
+    const text = input.trim();
+    if (!conversationId || !text || busy) return;
     setBusy(true);
+    setError(null);
+    const userMsg: MessageResponse = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: text,
+      tool_name: null,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
     try {
-      const reply = await api.sendChat(conversationId, input.trim());
-      setMessages((prev) => [
-        ...prev,
-        { id: `u-${Date.now()}`, role: "user", content: input, tool_name: null },
-        reply,
-      ]);
-      setInput("");
+      const reply = await api.sendChat(conversationId, text);
+      setMessages((prev) => [...prev, reply]);
+    } catch (err) {
+      if (isUnauthorized(err)) {
+        router.replace("/login");
+        return;
+      }
+      setError(getApiDetail(err, "Send failed"));
     } finally {
       setBusy(false);
     }
   }
+
+  const canSend = Boolean(conversationId) && Boolean(input.trim()) && !busy;
 
   return (
     <AppShell householdId={householdId}>
@@ -56,7 +81,12 @@ export default function AssistantPage() {
       </div>
 
       <div className="list-card" style={{ minHeight: 360, padding: 20 }}>
-        {messages.length === 0 && (
+        {!ready && (
+          <p className="muted" style={{ margin: 0 }}>
+            Starting chat…
+          </p>
+        )}
+        {ready && messages.length === 0 && !error && (
           <p className="muted" style={{ margin: 0 }}>
             Try “How much did I spend on dining?” or “Am I on track this month?”
           </p>
@@ -86,18 +116,30 @@ export default function AssistantPage() {
             <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{m.content}</p>
           </div>
         ))}
+        {error && (
+          <p className="error" style={{ marginTop: messages.length ? 8 : 0 }}>
+            {error}
+          </p>
+        )}
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+      <div className="assistant-composer" style={{ display: "flex", gap: 10, marginTop: 16 }}>
         <input
+          className="assistant-input"
           style={{ flex: 1 }}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
           placeholder="Ask Woney…"
           aria-label="Message"
+          disabled={busy || !conversationId}
         />
-        <button type="button" className="btn btn-primary" onClick={send} disabled={busy}>
+        <button type="button" className="btn btn-primary" onClick={() => void send()} disabled={!canSend}>
           {busy ? "…" : "Send"}
         </button>
       </div>
