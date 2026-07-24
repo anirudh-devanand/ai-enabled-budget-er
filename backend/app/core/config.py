@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     microsoft_oauth_client_secret: str | None = None
     oauth_redirect_uri: str = "http://localhost:3000/login/oauth/callback"
 
+    # Optional email (Resend) — used for account-deletion OTPs when set.
+    resend_api_key: str | None = None
+    email_from: str | None = None  # e.g. "Woney <noreply@yourdomain.com>"
+
     @field_validator("env")
     @classmethod
     def normalize_env(cls, value: str) -> str:
@@ -87,6 +91,8 @@ class Settings(BaseSettings):
         "ops_token",
         "llm_api_key",
         "flinks_auth_key",
+        "resend_api_key",
+        "email_from",
         mode="before",
     )
     @classmethod

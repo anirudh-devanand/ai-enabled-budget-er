@@ -6,6 +6,8 @@ import type {
   CategoryResponse,
   ConnectionResponse,
   ConversationResponse,
+  DeleteConfirmRequest,
+  DeleteRequestResponse,
   GoalResponse,
   HouseholdDetailResponse,
   HouseholdResponse,
@@ -222,6 +224,23 @@ export class LedgerClient {
       { display_name: displayName },
       { auth: true },
     );
+  }
+
+  requestAccountDeletion() {
+    return this.request<DeleteRequestResponse>("POST", "/v1/account/delete/request", undefined, {
+      auth: true,
+    });
+  }
+
+  async confirmAccountDeletion(body: DeleteConfirmRequest) {
+    const result = await this.request<{ deleted: boolean }>(
+      "POST",
+      "/v1/account/delete/confirm",
+      body,
+      { auth: true },
+    );
+    this.storage.clear();
+    return result;
   }
 
   listOAuthProviders() {

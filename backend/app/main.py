@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.account.router import router as account_router
 from app.assistant.router import router as assistant_router
 from app.auth.router import router as auth_router
 from app.budgets.router import router as budgets_router
@@ -45,6 +46,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(account_router)
 app.include_router(households_router)
 app.include_router(connections_router)
 app.include_router(categories_router)

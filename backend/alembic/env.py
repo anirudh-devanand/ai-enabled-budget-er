@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.database import Base
 
 # Import models so they register on Base.metadata.
+from app.account import models as _account_models  # noqa: F401
 from app.auth import models as _auth_models  # noqa: F401
 from app.assistant import models as _assistant_models  # noqa: F401
 from app.enrichment import prefs as _prefs_models  # noqa: F401

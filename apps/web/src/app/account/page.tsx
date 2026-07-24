@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { CategoryResponse, ConnectionResponse, UserResponse } from "@ledger/api-client";
+import type {
+  CategoryResponse,
+  ConnectionResponse,
+  DeleteRequestResponse,
+  UserResponse,
+} from "@ledger/api-client";
 import { BankLogo } from "@/components/BankLogo";
 import { CategoryGlyph } from "@/components/CategoryIcon";
 import { CategoryIcon, AppShell } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
-import { isUnauthorized } from "@/lib/errors";
+import { getApiDetail, isUnauthorized } from "@/lib/errors";
 
 function formatSynced(iso: string | null | undefined) {
   if (!iso) return "Never synced";
@@ -23,6 +28,8 @@ function formatSynced(iso: string | null | undefined) {
     return `Synced ${iso.slice(0, 10)}`;
   }
 }
+
+type DeleteStep = "idle" | "confirm";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -38,6 +45,15 @@ export default function AccountPage() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [extrasAvailable, setExtrasAvailable] = useState(true);
+
+  const [deleteStep, setDeleteStep] = useState<DeleteStep>("idle");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteChallenge, setDeleteChallenge] = useState<DeleteRequestResponse | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteEmailConfirm, setDeleteEmailConfirm] = useState("");
+  const [deleteCode, setDeleteCode] = useState("");
+  const [deletePhrase, setDeletePhrase] = useState("");
 
   const load = useCallback(async () => {
     const [me, households] = await Promise.all([api.me(), api.listHouseholds()]);
@@ -119,6 +135,67 @@ export default function AccountPage() {
     }
   }
 
+  function resetDeleteForm() {
+    setDeleteStep("idle");
+    setDeleteChallenge(null);
+    setDeletePassword("");
+    setDeleteEmailConfirm("");
+    setDeleteCode("");
+    setDeletePhrase("");
+    setDeleteError(null);
+  }
+
+  async function startDelete() {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const challenge = await api.requestAccountDeletion();
+      setDeleteChallenge(challenge);
+      if (challenge.delivery === "inline" && challenge.code) {
+        setDeleteCode(challenge.code);
+      } else {
+        setDeleteCode("");
+      }
+      setDeleteStep("confirm");
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setDeleteError(getApiDetail(err, "Could not start deletion"));
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteChallenge) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await api.confirmAccountDeletion({
+        code: deleteCode.trim(),
+        confirm: "DELETE",
+        password: deleteChallenge.requires_password ? deletePassword : undefined,
+        email_confirm: deleteChallenge.requires_password ? undefined : deleteEmailConfirm.trim(),
+      });
+      router.replace("/login");
+    } catch (err) {
+      // Wrong password/code is 401 — keep the form unless the session is gone.
+      const detail = getApiDetail(err, "Could not delete account");
+      const lower = detail.toLowerCase();
+      if (
+        isUnauthorized(err) &&
+        (lower.includes("not authenticated") ||
+          lower.includes("credentials") ||
+          lower.includes("token"))
+      ) {
+        router.replace("/login");
+        return;
+      }
+      setDeleteError(detail);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   if (!user) {
     return (
       <div className="app-main">
@@ -128,6 +205,12 @@ export default function AccountPage() {
   }
 
   const initial = (displayName || user.email || "W").trim().charAt(0).toUpperCase();
+  const codeLabel =
+    deleteChallenge?.delivery === "totp"
+      ? "Authenticator code"
+      : deleteChallenge?.delivery === "email"
+        ? "Email code"
+        : "Confirmation code";
 
   return (
     <AppShell householdId={householdId}>
@@ -302,6 +385,118 @@ export default function AccountPage() {
           </div>
         ))}
       </div>
+
+      <div className="section-title">Danger zone</div>
+      <section className="account-panel account-danger">
+        <h3>Delete account</h3>
+        <p className="panel-lede">
+          Permanently remove your account, bank links, transactions, and assistant history. This
+          cannot be undone.
+        </p>
+
+        {deleteStep === "idle" && (
+          <>
+            {deleteError && <div className="error">{deleteError}</div>}
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={startDelete}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? "Preparing…" : "Delete account"}
+            </button>
+          </>
+        )}
+
+        {deleteStep === "confirm" && deleteChallenge && (
+          <div className="delete-flow">
+            <p className="muted" style={{ marginTop: 0 }}>
+              {deleteChallenge.message}
+            </p>
+            {deleteChallenge.delivery === "inline" && deleteChallenge.code && (
+              <p className="delete-inline-code">
+                Your code: <strong>{deleteChallenge.code}</strong>
+              </p>
+            )}
+
+            {deleteChallenge.requires_password ? (
+              <div className="field">
+                <label htmlFor="delete-password">Password</label>
+                <input
+                  id="delete-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="field">
+                <label htmlFor="delete-email">Re-enter your email</label>
+                <input
+                  id="delete-email"
+                  type="email"
+                  autoComplete="email"
+                  value={deleteEmailConfirm}
+                  onChange={(e) => setDeleteEmailConfirm(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="field">
+              <label htmlFor="delete-code">{codeLabel}</label>
+              <input
+                id="delete-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={deleteCode}
+                onChange={(e) => setDeleteCode(e.target.value)}
+                placeholder={deleteChallenge.delivery === "totp" ? "6-digit code" : "Code"}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="delete-phrase">
+                Type <span className="mono">DELETE</span> to confirm
+              </label>
+              <input
+                id="delete-phrase"
+                value={deletePhrase}
+                onChange={(e) => setDeletePhrase(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+
+            {deleteError && <div className="error">{deleteError}</div>}
+
+            <div className="delete-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={resetDeleteForm}
+                disabled={deleteBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDelete}
+                disabled={
+                  deleteBusy ||
+                  deletePhrase !== "DELETE" ||
+                  !deleteCode.trim() ||
+                  (deleteChallenge.requires_password
+                    ? deletePassword.length < 8
+                    : !deleteEmailConfirm.trim())
+                }
+              >
+                {deleteBusy ? "Deleting…" : "Permanently delete"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
     </AppShell>
   );
 }

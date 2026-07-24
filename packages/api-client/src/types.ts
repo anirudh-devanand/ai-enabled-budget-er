@@ -44,6 +44,21 @@ export interface MfaActivateResponse {
   recovery_codes: string[];
 }
 
+export interface DeleteRequestResponse {
+  delivery: "email" | "totp" | "inline";
+  expires_in_seconds: number;
+  requires_password: boolean;
+  message: string;
+  code: string | null;
+}
+
+export interface DeleteConfirmRequest {
+  code: string;
+  confirm: "DELETE";
+  password?: string;
+  email_confirm?: string;
+}
+
 export function isMfaChallenge(r: LoginResponse): r is MfaChallengeResponse {
   return (r as MfaChallengeResponse).mfa_required === true;
 }
