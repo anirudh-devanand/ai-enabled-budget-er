@@ -1,5 +1,5 @@
 {
-  "name": "ledger",
+  "name": "woney",
   "private": true,
   "workspaces": [
     "packages/api-client",

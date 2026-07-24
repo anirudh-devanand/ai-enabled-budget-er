@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { AccountDetailResponse, AccountResponse, TransactionResponse } from "@ledger/api-client";
+import type { AccountDetailResponse, AccountResponse, TransactionResponse } from "@woney/api-client";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";

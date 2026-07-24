@@ -1,6 +1,6 @@
 """Optional LLM gateway for enrichment and the assistant.
 
-When LEDGER_LLM_API_KEY is unset the gateway is a no-op so the rest of the
+When WONEY_LLM_API_KEY is unset the gateway is a no-op so the rest of the
 pipeline still works offline. Providers: anthropic (default) or openai.
 """
 

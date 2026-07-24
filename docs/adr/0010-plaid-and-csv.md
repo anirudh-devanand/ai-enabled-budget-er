@@ -22,7 +22,7 @@ approach would leave a Canadian fintech gap.
 ## Consequences
 
 - Connect UI offers three tabs: Plaid Link, CSV import, Demo data.
-- Env: `LEDGER_PLAID_CLIENT_ID`, `LEDGER_PLAID_SECRET`, `LEDGER_PLAID_ENV` (`sandbox` |
+- Env: `WONEY_PLAID_CLIENT_ID`, `WONEY_PLAID_SECRET`, `WONEY_PLAID_ENV` (`sandbox` |
   `production`).
 - Neo users import statements until Flinks (or another CA-native aggregator) becomes affordable.
 - Plaid amount sign is inverted to match our positive=inflow convention.

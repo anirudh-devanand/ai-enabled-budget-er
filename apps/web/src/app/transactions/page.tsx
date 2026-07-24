@@ -6,7 +6,7 @@ import type {
   AccountResponse,
   CategoryResponse,
   TransactionResponse,
-} from "@ledger/api-client";
+} from "@woney/api-client";
 import { AppShell, CategoryIcon, FilterBar } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";

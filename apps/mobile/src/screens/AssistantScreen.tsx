@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { ApiError } from "@ledger/api-client";
+import { ApiError } from "@woney/api-client";
 import { api } from "../api";
 import { colors } from "../theme";
 

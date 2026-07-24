@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { ApiError, isMfaChallenge, type UserResponse } from "@ledger/api-client";
+import { ApiError, isMfaChallenge, type UserResponse } from "@woney/api-client";
 import { api } from "./src/api";
 import { PasswordStrength } from "./src/components/ui";
 import { colors, passwordScore } from "./src/theme";

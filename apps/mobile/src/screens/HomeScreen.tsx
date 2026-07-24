@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import type { AccountResponse, HouseholdResponse, TransactionResponse } from "@ledger/api-client";
+import type { AccountResponse, HouseholdResponse, TransactionResponse } from "@woney/api-client";
 import { api } from "../api";
 import { CategoryIcon } from "../components/ui";
 import { colors, money } from "../theme";

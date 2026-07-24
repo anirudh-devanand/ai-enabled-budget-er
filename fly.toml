@@ -1,8 +1,9 @@
 # fly.io — deploy from repo root: fly launch --config fly.toml --dockerfile backend/Dockerfile
-# Then: fly secrets set LEDGER_ENV=production LEDGER_JWT_SECRET=... LEDGER_DATABASE_URL=... \
-#   LEDGER_DATA_ENCRYPTION_KEY=... LEDGER_OPS_TOKEN=... LEDGER_CORS_ORIGINS=https://...
+# Then: fly secrets set WONEY_ENV=production WONEY_JWT_SECRET=... WONEY_DATABASE_URL=... \
+#   WONEY_DATA_ENCRYPTION_KEY=... WONEY_OPS_TOKEN=... WONEY_CORS_ORIGINS=https://...
+# Legacy LEDGER_* secret names still work until you migrate (see backend/app/core/config.py).
 
-app = "ledger-api"
+app = "woney-api"
 primary_region = "yyz"
 
 [build]

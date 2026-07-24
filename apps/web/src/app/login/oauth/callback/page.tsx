@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ApiError, isMfaChallenge } from "@ledger/api-client";
+import { ApiError, isMfaChallenge } from "@woney/api-client";
 import { readOAuthProvider } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
 

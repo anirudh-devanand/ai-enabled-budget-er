@@ -7,7 +7,7 @@ import type {
   HouseholdResponse,
   TransactionResponse,
   UserResponse,
-} from "@ledger/api-client";
+} from "@woney/api-client";
 import { BankLogo } from "@/components/BankLogo";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";

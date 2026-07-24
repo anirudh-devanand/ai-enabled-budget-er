@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { ApiError } from "@ledger/api-client";
+import { ApiError } from "@woney/api-client";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 
@@ -73,7 +73,7 @@ function ConnectInner() {
           setError(
             err instanceof ApiError
               ? err.detail
-              : "Could not start Plaid Link. Check LEDGER_PLAID_* on the API.",
+              : "Could not start Plaid Link. Check WONEY_PLAID_* on the API.",
           );
         }
       }

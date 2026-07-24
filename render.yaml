@@ -1,33 +1,38 @@
 # Render Blueprint — API + managed Postgres
 # https://render.com/docs/blueprint-spec
 # Connect this GitHub repo in Render Dashboard → New → Blueprint
+#
+# Existing live services named ledger-* stay until you rename them manually
+# (see docs/hosting-rename.md). This file targets the Woney names for new/synced blueprints.
+# Env: code reads WONEY_* primarily and still accepts LEDGER_* as aliases.
 
 databases:
-  - name: ledger-db
+  - name: woney-db
     plan: free
-    databaseName: ledger
-    user: ledger
+    # Keep DB role/name stable for existing data; new blueprints use woney.
+    databaseName: woney
+    user: woney
 
 services:
   - type: web
-    name: ledger-api
+    name: woney-api
     runtime: docker
     plan: free
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /healthz
     envVars:
-      - key: LEDGER_ENV
+      - key: WONEY_ENV
         value: production
-      - key: LEDGER_DATABASE_URL
+      - key: WONEY_DATABASE_URL
         fromDatabase:
-          name: ledger-db
+          name: woney-db
           property: connectionString
-      - key: LEDGER_JWT_SECRET
+      - key: WONEY_JWT_SECRET
         generateValue: true
-      - key: LEDGER_DATA_ENCRYPTION_KEY
+      - key: WONEY_DATA_ENCRYPTION_KEY
         sync: false
-      - key: LEDGER_OPS_TOKEN
+      - key: WONEY_OPS_TOKEN
         generateValue: true
-      - key: LEDGER_CORS_ORIGINS
+      - key: WONEY_CORS_ORIGINS
         sync: false

@@ -88,7 +88,7 @@ async def revoke_all_sessions(db: AsyncSession, user_id: uuid.UUID) -> int:
 def build_mfa_enrollment(user: User) -> tuple[str, str, str]:
     """Returns (plain_secret, encrypted_secret, otpauth_uri)."""
     secret = pyotp.random_base32()
-    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="Ledger")
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="Woney")
     return secret, encrypt_secret(secret), uri
 
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { NamedAmount, NetWorthResponse } from "@ledger/api-client";
+import type { NamedAmount, NetWorthResponse } from "@woney/api-client";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";

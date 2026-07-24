@@ -29,7 +29,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Ledger API",
+    title="Woney API",
     version="0.2.0",
     debug=settings.debug,
     lifespan=lifespan,

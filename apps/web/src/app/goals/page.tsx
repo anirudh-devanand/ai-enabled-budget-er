@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { GoalResponse, PlanResponse } from "@ledger/api-client";
+import type { GoalResponse, PlanResponse } from "@woney/api-client";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";

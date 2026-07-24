@@ -1,6 +1,6 @@
 # Architecture
 
-Ledger (working name) is a personal-finance platform: iOS + Android apps, a full web app, and a
+Woney is a personal-finance platform: iOS + Android apps, a full web app, and a
 Python backend that syncs bank data, enriches transactions, and drives an AI assistant and budget
 planner.
 

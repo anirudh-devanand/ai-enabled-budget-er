@@ -1,31 +1,34 @@
-# Production deploy — Ledger
+# Production deploy — Woney
 
 Host the API on **Render** (Blueprint) or **Fly.io**, and the web app on **Vercel**.
 Mobile reaches the same public HTTPS API via `EXPO_PUBLIC_API_URL`.
+
+Env prefix is **`WONEY_`**. Legacy **`LEDGER_*`** names still work until you migrate
+(see [hosting-rename.md](hosting-rename.md)).
 
 ## 1. Backend (Render Blueprint — recommended)
 
 1. Push this repo to GitHub.
 2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → select the repo.
 3. Set these secrets when prompted (or after create):
-   - `LEDGER_DATA_ENCRYPTION_KEY` — `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-   - `LEDGER_CORS_ORIGINS` — your Vercel URL, e.g. `https://ledger-xxx.vercel.app`
-4. Render generates `LEDGER_JWT_SECRET` and `LEDGER_OPS_TOKEN`.
-5. **Important:** Render Postgres connection strings use `postgres://`; rewrite to
-   `postgresql+asyncpg://...` (replace scheme) in `LEDGER_DATABASE_URL`.
+   - `WONEY_DATA_ENCRYPTION_KEY` — `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+   - `WONEY_CORS_ORIGINS` — your Vercel URL(s), e.g. `https://woney-web-blue.vercel.app` (include the old `ledger-web-*` origin during rename)
+4. Render generates `WONEY_JWT_SECRET` and `WONEY_OPS_TOKEN`.
+5. **Important:** Render Postgres connection strings use `postgres://`; the Docker entrypoint
+   rewrites to `postgresql+asyncpg://...` for `WONEY_DATABASE_URL` (and legacy `LEDGER_DATABASE_URL`).
 6. Confirm `https://<api-host>/healthz` returns `{"status":"ok","database":"up"}`.
 
 ### Alternative: Fly.io
 
 ```bash
 fly launch --config fly.toml --no-deploy
-fly postgres create --name ledger-db --region yyz
-fly postgres attach ledger-db -a ledger-api
-fly secrets set LEDGER_ENV=production \
-  LEDGER_JWT_SECRET="$(openssl rand -hex 32)" \
-  LEDGER_DATA_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
-  LEDGER_OPS_TOKEN="$(openssl rand -hex 24)" \
-  LEDGER_CORS_ORIGINS="https://YOUR_VERCEL_URL"
+fly postgres create --name woney-db --region yyz
+fly postgres attach woney-db -a woney-api
+fly secrets set WONEY_ENV=production \
+  WONEY_JWT_SECRET="$(openssl rand -hex 32)" \
+  WONEY_DATA_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
+  WONEY_OPS_TOKEN="$(openssl rand -hex 24)" \
+  WONEY_CORS_ORIGINS="https://YOUR_VERCEL_URL"
 # Fix DATABASE_URL scheme to postgresql+asyncpg:// if needed
 fly deploy
 ```
@@ -36,12 +39,12 @@ fly deploy
 2. Environment variables:
    - `NEXT_PUBLIC_API_URL` = `https://<your-api-host>` (no trailing slash)
    - `NEXT_PUBLIC_FLINKS_IFRAME_URL` = your Flinks Connect iframe URL (sandbox or prod)
-3. Deploy. Update API `LEDGER_CORS_ORIGINS` to the Vercel production URL and redeploy API if needed.
+3. Deploy. Update API `WONEY_CORS_ORIGINS` to the Vercel production URL and redeploy API if needed.
 
 ## 3. Cron (optional)
 
 ```bash
-curl -X POST "https://<api-host>/v1/ops/sync-all" -H "X-Ops-Token: $LEDGER_OPS_TOKEN"
+curl -X POST "https://<api-host>/v1/ops/sync-all" -H "X-Ops-Token: $WONEY_OPS_TOKEN"
 ```
 
 Schedule every 6–12 hours (Render Cron Job, GitHub Actions, or Fly Machines).
@@ -77,3 +80,4 @@ Set `EXPO_PUBLIC_API_URL` in EAS secrets / `eas.json` env for production profile
 - [ ] Mobile Expo Go reaches API over HTTPS
 - [ ] Secrets are not the repo defaults
 - [ ] Ops token only known to cron
+- [ ] After rebrand: follow [hosting-rename.md](hosting-rename.md)

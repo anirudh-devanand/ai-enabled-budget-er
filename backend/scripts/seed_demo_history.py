@@ -1,7 +1,7 @@
 """CLI: seed demo bank history for a user.
 
   cd backend
-  set LEDGER_DATABASE_URL=postgresql+asyncpg://...
+  set WONEY_DATABASE_URL=postgresql+asyncpg://...
   python -m scripts.seed_demo_history --email anirudh.d.575@gmail.com
 """
 

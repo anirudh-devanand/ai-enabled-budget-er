@@ -1,8 +1,8 @@
 import os
 
 # Configure before app imports read settings.
-os.environ["LEDGER_DATABASE_URL"] = "sqlite+aiosqlite://"
-os.environ["LEDGER_JWT_SECRET"] = "test-secret"
+os.environ["WONEY_DATABASE_URL"] = "sqlite+aiosqlite://"
+os.environ["WONEY_JWT_SECRET"] = "test-secret"
 
 import pytest
 import pytest_asyncio

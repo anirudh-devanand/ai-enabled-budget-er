@@ -1,23 +1,39 @@
+import os
 from functools import lru_cache
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _apply_legacy_ledger_env_aliases() -> None:
+    """Copy LEDGER_* → WONEY_* when WONEY_* is unset (Render transition).
+
+    Primary prefix is WONEY_. Existing hosts can keep LEDGER_* until migrated.
+    If both are set, WONEY_* wins.
+    """
+    for key, value in list(os.environ.items()):
+        if not key.startswith("LEDGER_"):
+            continue
+        woney_key = "WONEY_" + key[len("LEDGER_") :]
+        existing = os.environ.get(woney_key)
+        if existing is None or (isinstance(existing, str) and existing.strip() == ""):
+            os.environ[woney_key] = value
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_prefix="LEDGER_",
+        env_prefix="WONEY_",
         extra="ignore",
         # Treat "" from host dashboards as unset (common on Render placeholders).
         env_ignore_empty=True,
     )
 
-    app_name: str = "ledger-api"
+    app_name: str = "woney-api"
     env: str = "development"  # development | production
     debug: bool = False
 
-    database_url: str = "postgresql+asyncpg://ledger:ledger@localhost:5432/ledger"
+    database_url: str = "postgresql+asyncpg://woney:woney@localhost:5432/woney"
 
     # Dev defaults only; production values come from a secrets manager.
     jwt_secret: str = "dev-only-change-me"
@@ -30,7 +46,11 @@ class Settings(BaseSettings):
     data_encryption_key: str = "3jJ8mYIphC0v9tS2mvBrLnPuqcJZTsvUV84BxSZuXAo="
 
     # Comma-separated browser origins allowed for CORS (empty = allow all in development).
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # Includes both new and legacy Vercel hosts during the Ledger → Woney rename.
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app"
+    )
 
     # Shared secret for cron/batch ops (X-Ops-Token). Required in production for /v1/ops/*.
     ops_token: str | None = None
@@ -42,7 +62,7 @@ class Settings(BaseSettings):
     flinks_days_of_transactions: str = "Days365"
 
     # Plaid (primary indie path). Sandbox free; Trial/Production for real CA banks.
-    # Exact Render names: LEDGER_PLAID_CLIENT_ID, LEDGER_PLAID_SECRET, LEDGER_PLAID_ENV
+    # Exact Render names: WONEY_PLAID_* (LEDGER_PLAID_* still accepted via alias).
     plaid_client_id: str | None = None
     plaid_secret: str | None = None
     plaid_env: str = "sandbox"  # sandbox | development | production
@@ -136,19 +156,20 @@ class Settings(BaseSettings):
             return
         problems: list[str] = []
         if self.jwt_secret in ("", "dev-only-change-me"):
-            problems.append("LEDGER_JWT_SECRET must be set to a strong random value")
+            problems.append("WONEY_JWT_SECRET (or legacy LEDGER_JWT_SECRET) must be set to a strong random value")
         if self.data_encryption_key == "3jJ8mYIphC0v9tS2mvBrLnPuqcJZTsvUV84BxSZuXAo=":
-            problems.append("LEDGER_DATA_ENCRYPTION_KEY must be a unique Fernet key")
+            problems.append("WONEY_DATA_ENCRYPTION_KEY (or legacy LEDGER_DATA_ENCRYPTION_KEY) must be a unique Fernet key")
         if not self.ops_token:
-            problems.append("LEDGER_OPS_TOKEN must be set for cron/ops endpoints")
+            problems.append("WONEY_OPS_TOKEN (or legacy LEDGER_OPS_TOKEN) must be set for cron/ops endpoints")
         if not self.cors_origin_list():
-            problems.append("LEDGER_CORS_ORIGINS must list at least one web origin")
+            problems.append("WONEY_CORS_ORIGINS (or legacy LEDGER_CORS_ORIGINS) must list at least one web origin")
         if problems:
             raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
 
 
 @lru_cache
 def get_settings() -> Settings:
+    _apply_legacy_ledger_env_aliases()
     settings = Settings()
     settings.assert_production_safe()
     return settings

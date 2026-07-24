@@ -8,8 +8,8 @@ import {
   Text,
   View,
 } from "react-native";
-import type { BudgetDetailResponse, NamedAmount } from "@ledger/api-client";
-import { ApiError } from "@ledger/api-client";
+import type { BudgetDetailResponse, NamedAmount } from "@woney/api-client";
+import { ApiError } from "@woney/api-client";
 import { api } from "../api";
 import { CategoryIcon } from "../components/ui";
 import { colors, money } from "../theme";

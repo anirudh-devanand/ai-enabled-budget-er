@@ -1,4 +1,4 @@
-# Ledger
+# Woney
 
 Personal finance platform for Canada: live bank sync (including fintechs like Neo Financial and
 EQ Bank via Flinks), transaction categorization that never shows a vague merchant, rich
@@ -21,13 +21,14 @@ richer narration; everything else runs offline against Flinks sandbox + rule/emb
 - Budgets (flexible / zero-based) with propose-from-history and target vs actual
 - Metrics: net worth, cash flow, spending by category/merchant, Sankey payload
 - Goals + deterministic AI planner (monthly needed, cuts, scenario modeling - math never from LLM)
-- AI assistant with tool-calling (works offline from live tools; Anthropic when `LEDGER_LLM_API_KEY` set)
+- AI assistant with tool-calling (works offline from live tools; Anthropic when `WONEY_LLM_API_KEY` set)
 - Notifications for sync events
 - Web: dashboard, connect, transactions, insights, budgets, goals, assistant
 - Mobile: Expo app with home, transactions, budgets, goals, assistant, bank connect deep-link;
   register/login/MFA/recovery codes; EAS profiles for preview APK / store builds
 - Production: CORS, DB health check, production secret gate, ops token for cron sync,
   `.env.example`, Render/Fly/Vercel configs — [docs/deploy.md](docs/deploy.md)
+
 ## Architecture
 
 ```mermaid
@@ -69,8 +70,8 @@ npm run dev --workspace apps/web
 # http://localhost:3000
 ```
 
-Optional: set `LEDGER_LLM_API_KEY` (Anthropic) for LLM enrichment and richer assistant replies.
-Flinks sandbox needs no keys; for a real instance set `LEDGER_FLINKS_*` and
+Optional: set `WONEY_LLM_API_KEY` (Anthropic) for LLM enrichment and richer assistant replies.
+Flinks sandbox needs no keys; for a real instance set `WONEY_FLINKS_*` and
 `NEXT_PUBLIC_FLINKS_IFRAME_URL`.
 
 ```bash
@@ -94,6 +95,7 @@ cd backend && python -m pytest -q
 ## Production deploy
 
 See **[docs/deploy.md](docs/deploy.md)** for Render/Fly + Vercel + Expo Go / EAS.
+Rebrand / rename live hosts: **[docs/hosting-rename.md](docs/hosting-rename.md)**.
 
 ```bash
 # Mobile against a public API

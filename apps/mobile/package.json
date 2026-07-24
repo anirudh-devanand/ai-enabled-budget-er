@@ -1,5 +1,5 @@
 {
-  "name": "@ledger/mobile",
+  "name": "@woney/mobile",
   "version": "0.1.0",
   "private": true,
   "main": "index.ts",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
-    "@ledger/api-client": "*",
+    "@woney/api-client": "*",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.0",
     "expo-asset": "~12.0.13",

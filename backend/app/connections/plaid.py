@@ -66,7 +66,7 @@ class PlaidProvider:
         settings = get_settings()
         if not settings.plaid_configured:
             raise ProviderError(
-                "Plaid is not configured (set LEDGER_PLAID_CLIENT_ID and LEDGER_PLAID_SECRET "
+                "Plaid is not configured (set WONEY_PLAID_CLIENT_ID and WONEY_PLAID_SECRET "
                 "on the API host, then redeploy; GET /healthz reports plaid_configured)"
             )
         body = {

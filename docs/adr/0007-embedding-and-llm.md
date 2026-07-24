@@ -15,7 +15,7 @@ and LLM resolution without requiring pgvector or a paid API key for local/dev de
 2. Match primarily by **content-token Jaccard** (Canadian city/province noise stripped),
    with cosine as a tie-break. Require at least two shared content tokens. This catches
    "BLUE BOTTLE ROASTERS VAN" -> "BLUE BOTTLE COFFEE TORONTO" without an external model.
-3. LLM enrichment is optional via `LEDGER_LLM_API_KEY` (Anthropic Messages API). When unset,
+3. LLM enrichment is optional via `WONEY_LLM_API_KEY` (Anthropic Messages API). When unset,
    the stage is a no-op and the cascade falls through to `unresolved`.
 4. The assistant uses the same gateway: with no key it still answers from live tools
    (net worth, spending, budgets, goals); with a key it runs a real tool-calling loop.
@@ -25,4 +25,4 @@ and LLM resolution without requiring pgvector or a paid API key for local/dev de
 - No pgvector dependency; works on SQLite test DBs and Postgres alike.
 - Token overlap can false-positive on short shared words; the two-token minimum and noise
   list mitigate this. Swap in a real embedding API later behind `embed_text()` if needed.
-- Production demos of LLM narration need `LEDGER_LLM_API_KEY`; everything else works offline.
+- Production demos of LLM narration need `WONEY_LLM_API_KEY`; everything else works offline.

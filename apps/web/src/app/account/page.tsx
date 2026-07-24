@@ -8,7 +8,7 @@ import type {
   ConnectionResponse,
   DeleteRequestResponse,
   UserResponse,
-} from "@ledger/api-client";
+} from "@woney/api-client";
 import { BankLogo } from "@/components/BankLogo";
 import { CategoryGlyph } from "@/components/CategoryIcon";
 import { CategoryIcon, AppShell } from "@/components/ui";

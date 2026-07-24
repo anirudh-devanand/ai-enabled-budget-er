@@ -9,8 +9,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { GoalResponse, PlanResponse } from "@ledger/api-client";
-import { ApiError } from "@ledger/api-client";
+import type { GoalResponse, PlanResponse } from "@woney/api-client";
+import { ApiError } from "@woney/api-client";
 import { api } from "../api";
 import { colors, money } from "../theme";
 

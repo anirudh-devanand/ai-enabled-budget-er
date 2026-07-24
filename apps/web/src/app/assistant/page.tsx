@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { MessageResponse } from "@ledger/api-client";
+import type { MessageResponse } from "@woney/api-client";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getApiDetail, isUnauthorized } from "@/lib/errors";

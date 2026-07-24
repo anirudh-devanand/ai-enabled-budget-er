@@ -25,7 +25,17 @@ def _parse(raw: str) -> Any:
 
 
 def _intent(question: str) -> str:
-    q = question.lower()
+    q = question.lower().strip()
+    # Greetings / meta — don't dump a full overview for "hi" or pushback.
+    if re.search(
+        r"^(hi|hello|hey|yo|sup|good\s*(morning|afternoon|evening)|howdy)\b"
+        r"|^(thanks|thank you|thx|ty)\b"
+        r"|\b(that (isn'?t|is not|wasn'?t)|not what i asked|wrong answer|"
+        r"didn'?t ask|you (didn'?t|misunderstood))\b"
+        r"|\b(help|what can you (do|answer)|how (do|does) this work)\b",
+        q,
+    ):
+        return "greeting"
     if re.search(r"\b(dining|restaurant|takeout|coffee|food)\b", q):
         return "dining"
     if re.search(r"\b(grocer|grocery|supermarket)\b", q):
@@ -72,7 +82,15 @@ def format_offline_reply(question: str, spending_json: str, net_json: str) -> st
 
     lines: list[str] = []
 
-    if intent in {
+    if intent == "greeting":
+        lines.append(
+            "Hi — I’m Woney. I can answer from your live account data: net worth, "
+            "spending by category (e.g. dining, groceries), budgets, and goals."
+        )
+        lines.append(
+            "Try something like “What’s my net worth?” or “How much did I spend on dining?”"
+        )
+    elif intent in {
         "dining",
         "groceries",
         "transport",

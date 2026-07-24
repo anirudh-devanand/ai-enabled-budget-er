@@ -1,6 +1,6 @@
 "use client";
 
-import type { OAuthProvider } from "@ledger/api-client";
+import type { OAuthProvider } from "@woney/api-client";
 
 const PROVIDER_KEY = "woney_oauth_provider";
 
@@ -80,7 +80,7 @@ export function SsoButtons({ providers }: Props) {
               title={
                 ready
                   ? `Continue with ${p.name}`
-                  : `${p.name} SSO — add LEDGER_*_OAUTH credentials to enable`
+                  : `${p.name} SSO — add WONEY_*_OAUTH credentials to enable`
               }
               onClick={() => {
                 if (!p.auth_url) return;

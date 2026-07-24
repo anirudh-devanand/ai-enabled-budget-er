@@ -1,4 +1,4 @@
-import { ApiError } from "@ledger/api-client";
+import { ApiError } from "@woney/api-client";
 
 export function isUnauthorized(err: unknown): boolean {
   return getApiStatus(err) === 401;

@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
-import type { TransactionResponse } from "@ledger/api-client";
+import type { TransactionResponse } from "@woney/api-client";
 import { api } from "../api";
 import { CategoryIcon } from "../components/ui";
 import { colors, money } from "../theme";

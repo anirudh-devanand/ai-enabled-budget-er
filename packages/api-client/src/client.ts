@@ -98,7 +98,7 @@ export class MemoryTokenStorage implements TokenStorage {
   }
 }
 
-export class LedgerClient {
+export class WoneyClient {
   constructor(
     private baseUrl: string,
     private storage: TokenStorage = new MemoryTokenStorage(),
@@ -571,3 +571,6 @@ export class LedgerClient {
     );
   }
 }
+
+/** @deprecated Use WoneyClient — kept for any out-of-repo imports during rename. */
+export const LedgerClient = WoneyClient;
