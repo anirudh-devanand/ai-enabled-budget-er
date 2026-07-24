@@ -3,105 +3,61 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-/** Continuously looping hero product plane — distinct from Bank Sync section. */
+/** Looping hero logo mark — quiet pulse/draw, no card chrome. */
 function HeroScene() {
   return (
     <div className="landing-scene landing-scene--hero" aria-hidden>
-      <div className="landing-scene-glow landing-hero-glow" />
-      <div className="landing-scene-panel landing-hero-panel">
-        <div className="landing-hero-top">
-          <p className="landing-scene-label">Available</p>
-          <p className="landing-scene-amount landing-hero-amount">
-            <span className="landing-hero-currency">$</span>
-            <span className="landing-hero-digits">8,642.15</span>
-          </p>
-          <p className="landing-hero-delta">
-            <span className="landing-hero-delta-pill">+2.4%</span>
-            <span>this month</span>
-          </p>
-        </div>
-
-        <div className="landing-hero-ring-wrap">
-          <svg className="landing-hero-ring" viewBox="0 0 120 120">
-            <circle className="landing-hero-ring-track" cx="60" cy="60" r="48" />
-            <circle className="landing-hero-ring-progress" cx="60" cy="60" r="48" />
-          </svg>
-          <div className="landing-hero-ring-label">
-            <span>Budget</span>
-            <strong>68%</strong>
-          </div>
-        </div>
-
-        <ul className="landing-hero-feed">
-          <li className="landing-hero-feed-item" style={{ ["--i" as string]: 0 }}>
-            <span className="landing-hero-feed-dot" style={{ background: "#6b8f71" }} />
-            <span>Groceries</span>
-            <span>−$42.18</span>
-          </li>
-          <li className="landing-hero-feed-item" style={{ ["--i" as string]: 1 }}>
-            <span className="landing-hero-feed-dot" style={{ background: "#5c7a8a" }} />
-            <span>Transit</span>
-            <span>−$3.75</span>
-          </li>
-          <li className="landing-hero-feed-item" style={{ ["--i" as string]: 2 }}>
-            <span className="landing-hero-feed-dot" style={{ background: "#b89a4a" }} />
-            <span>Interest</span>
-            <span className="in">+$12.40</span>
-          </li>
-          <li className="landing-hero-feed-item" style={{ ["--i" as string]: 3 }}>
-            <span className="landing-hero-feed-dot" style={{ background: "#9a6b5c" }} />
-            <span>Dining</span>
-            <span>−$28.90</span>
-          </li>
-        </ul>
+      <div className="landing-hero-logo">
+        <svg className="landing-hero-logo-ring" viewBox="0 0 160 160">
+          <circle className="landing-hero-logo-ring-track" cx="80" cy="80" r="72" />
+          <circle className="landing-hero-logo-ring-draw" cx="80" cy="80" r="72" />
+        </svg>
+        <span className="landing-hero-wordmark">Woney</span>
       </div>
     </div>
   );
 }
 
-/** Static Bank Sync visual — accounts + institutions, not the hero mock. */
+/** Borderless Bank Sync visual — open list on the section background. */
 function BankSyncScene() {
   return (
-    <div className="landing-scene landing-scene--section" aria-hidden>
-      <div className="landing-scene-glow" />
-      <div className="landing-scene-panel landing-banks-panel">
-        <p className="landing-scene-label">Linked accounts</p>
-        <ul className="landing-banks-list">
-          <li>
-            <span className="landing-banks-mark" style={{ background: "#34A853" }}>
-              TD
-            </span>
-            <span className="landing-banks-meta">
-              <strong>TD Chequing</strong>
-              <em>••4821</em>
-            </span>
-            <span className="landing-banks-bal">$4,210.32</span>
-          </li>
-          <li>
-            <span className="landing-banks-mark" style={{ background: "#0051A5" }}>
-              RBC
-            </span>
-            <span className="landing-banks-meta">
-              <strong>RBC Savings</strong>
-              <em>••0194</em>
-            </span>
-            <span className="landing-banks-bal">$6,850.00</span>
-          </li>
-          <li>
-            <span className="landing-banks-mark" style={{ background: "#1C1C1C" }}>
-              WS
-            </span>
-            <span className="landing-banks-meta">
-              <strong>Wealthsimple Cash</strong>
-              <em>••7730</em>
-            </span>
-            <span className="landing-banks-bal">$1,420.28</span>
-          </li>
-        </ul>
-        <div className="landing-banks-sync">
-          <span className="landing-banks-sync-dot" />
-          Synced just now
-        </div>
+    <div className="landing-banks-plane" aria-hidden>
+      <p className="landing-scene-label">Linked accounts</p>
+      <ul className="landing-banks-list">
+        <li>
+          <span className="landing-banks-mark" style={{ background: "#34A853" }}>
+            TD
+          </span>
+          <span className="landing-banks-meta">
+            <strong>TD Chequing</strong>
+            <em>••4821</em>
+          </span>
+          <span className="landing-banks-bal">$4,210.32</span>
+        </li>
+        <li>
+          <span className="landing-banks-mark" style={{ background: "#0051A5" }}>
+            RBC
+          </span>
+          <span className="landing-banks-meta">
+            <strong>RBC Savings</strong>
+            <em>••0194</em>
+          </span>
+          <span className="landing-banks-bal">$6,850.00</span>
+        </li>
+        <li>
+          <span className="landing-banks-mark" style={{ background: "#1C1C1C" }}>
+            WS
+          </span>
+          <span className="landing-banks-meta">
+            <strong>Wealthsimple Cash</strong>
+            <em>••7730</em>
+          </span>
+          <span className="landing-banks-bal">$1,420.28</span>
+        </li>
+      </ul>
+      <div className="landing-banks-sync">
+        <span className="landing-banks-sync-dot" />
+        Synced just now
       </div>
     </div>
   );
@@ -150,7 +106,6 @@ export function Landing() {
 
       <section className="landing-hero">
         <div className="landing-hero-atmosphere" aria-hidden />
-        <HeroScene />
         <div className="landing-hero-copy">
           <p className="landing-brand landing-enter" style={{ ["--enter-delay" as string]: "0ms" }}>
             Woney
@@ -170,6 +125,7 @@ export function Landing() {
             </Link>
           </div>
         </div>
+        <HeroScene />
       </section>
 
       <section className="landing-block" data-reveal>
@@ -181,7 +137,7 @@ export function Landing() {
             the full picture without spreadsheet chaos.
           </p>
         </div>
-        <div className="landing-block-visual" data-reveal>
+        <div className="landing-block-visual landing-block-visual-soft" data-reveal>
           <BankSyncScene />
         </div>
       </section>
