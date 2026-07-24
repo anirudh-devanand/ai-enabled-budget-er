@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isMfaChallenge } from "@woney/api-client";
 import { readOAuthProvider } from "@/components/SsoButtons";
+import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { authErrorMessage } from "@/lib/errors";
 
@@ -34,26 +35,28 @@ function OAuthCallbackInner() {
     })();
   }, [params, router]);
 
-  return (
-    <main className="auth">
-      <section className="auth-panel" style={{ gridColumn: "1 / -1" }}>
-        <div className="auth-card">
-          <h1>Signing you in…</h1>
-          <p className="sub">{error || "Finishing secure sign-in with your provider."}</p>
-          {error && (
+  if (error) {
+    return (
+      <main className="auth">
+        <section className="auth-panel" style={{ gridColumn: "1 / -1" }}>
+          <div className="auth-card">
+            <h1>Sign-in failed</h1>
+            <p className="sub">{error}</p>
             <button type="button" className="btn btn-primary btn-block" onClick={() => router.push("/login")}>
               Back to sign in
             </button>
-          )}
-        </div>
-      </section>
-    </main>
-  );
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return <WoneyLoader label="Signing you in" />;
 }
 
 export default function OAuthCallbackPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<WoneyLoader label="Signing you in" />}>
       <OAuthCallbackInner />
     </Suspense>
   );
