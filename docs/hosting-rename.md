@@ -8,25 +8,59 @@ Intended hostnames after rename (adjust if your dashboard assigns a different su
 
 | Role | Old | New (target) |
 |------|-----|----------------|
-| Render web service | `ledger-api` → `https://ledger-api-ayer.onrender.com` | `woney-api` → `https://woney-api-ayer.onrender.com` |
-| Render Postgres | `ledger-db` (DB/user `ledger`) | Keep existing DB data; optional display rename to `woney-db`. Do **not** recreate the database. |
+| Render web service | `ledger-api` → `https://ledger-api-ayer.onrender.com` | `woney-api` → copy **exact** URL from Dashboard (may stay `ledger-api-ayer` or become `woney-api-….onrender.com`) |
+| Render Postgres | `ledger-db` (DB/user `ledger`) | Display rename to `woney-db` only. Keep DB/user `ledger`. Do **not** recreate the database. If you mistyped `wpney-db`, rename to `woney-db`. |
 | Vercel project | `ledger-web` → `https://ledger-web-blue.vercel.app` | `woney-web` → `https://woney-web-blue.vercel.app` (or keep old URL if Vercel preserves it) |
 | Fly app (if used) | `ledger-api` | `woney-api` (`fly apps rename` or new app) |
 | GitHub repo | `ai-enabled-budget-er` | Optional rename on GitHub only — folder/clone path unchanged here |
 
+**Live check (2026-07-24):** `https://ledger-api-ayer.onrender.com/healthz` still returns OK.
+`https://woney-api-ayer.onrender.com` was not reachable — always copy the hostname from the
+Render service page after rename before updating Vercel / EAS.
+
+## Blueprint desync (why services look “unmanaged”)
+
+Render Blueprints track resources by the **`name:` values in `render.yaml`**, not by
+dashboard-only renames. If you rename `ledger-api` → `woney-api` (and `ledger-db` →
+`woney-db`) in the Dashboard while `render.yaml` still says `ledger-*`, those resources
+become orphaned from the Blueprint (still running, but not Blueprint-managed).
+
+### Safe re-link (preferred)
+
+1. Confirm exact Dashboard names: `woney-api` and `woney-db` (fix `wpney-db` → `woney-db`).
+2. Ensure repo `render.yaml` uses those same `name:` fields (this repo already does).
+   Keep `databaseName` / `user` as **`ledger`** so Blueprint does not imply a new empty DB.
+3. Push to the branch linked to the Blueprint.
+4. Render Dashboard → your **Blueprint** → **Manual Sync** (or wait for Auto Sync).
+5. Render matches **by exact name** and re-adopts existing services/DBs — it does not need
+   a separate “Adopt” button when names already match ([Blueprint docs](https://render.com/docs/infrastructure-as-code)).
+6. Confirm both resources show as managed by the Blueprint again. Redeploy API if needed.
+7. Env vars already on the service (`LEDGER_*` or `WONEY_*`) keep working whether or not
+   Blueprint manages the service; `sync: false` secrets are not overwritten on sync.
+
+### If Sync still does not re-attach
+
+| Option | When | Risk |
+|--------|------|------|
+| **(a)** Rename Dashboard names **back** to `ledger-api` / `ledger-db`, sync with old yaml, then change yaml + rename together in one coordinated push/sync | Blueprint stubbornly won’t match | Low if careful |
+| **(b)** Leave services unmanaged; keep Git auto-deploy / manual deploys on the web service | Blueprint IaC not required day-to-day | Low — env vars still work |
+| **(c)** Delete Blueprint-managed copies and recreate | **Never delete Postgres** to “fix” Blueprint | **Dangerous — data loss** |
+
+**Never** delete `woney-db` / the Postgres instance to force a clean Blueprint.
+
 ## 1. Render (API)
 
-1. Deploy this commit first so the API accepts both `LEDGER_*` and `WONEY_*`.
-2. In the service (currently `ledger-api`):
-   - **Settings → Name** → rename display name to `woney-api` if Render allows (URL may change — copy the new `*.onrender.com` URL).
-   - Or create a new `woney-api` service pointing at the same repo/Dockerfile and attach the **existing** Postgres — then retire `ledger-api`. Prefer attach-existing over wiping data.
-3. Env vars — either leave `LEDGER_*` (still works) or duplicate then switch:
+1. Deploy a commit that accepts both `LEDGER_*` and `WONEY_*` (this rename series).
+2. Prefer aligning Blueprint names (section above) over creating a second API service.
+3. If you already renamed in the Dashboard:
+   - Copy the live `*.onrender.com` URL from the service page (do not assume `-ayer`).
+   - Env vars — either leave `LEDGER_*` (still works) or duplicate then switch:
    - Add `WONEY_ENV`, `WONEY_DATABASE_URL`, `WONEY_JWT_SECRET`, `WONEY_DATA_ENCRYPTION_KEY`, `WONEY_OPS_TOKEN`, `WONEY_CORS_ORIGINS`, plus any `WONEY_PLAID_*` / `WONEY_*_OAUTH_*` / `WONEY_LLM_API_KEY` / `WONEY_RESEND_*` you use.
    - Copy values from the matching `LEDGER_*` keys (do not regenerate JWT/Fernet unless you intend to invalidate sessions / re-encrypt TOTP).
    - Set `WONEY_CORS_ORIGINS` to include **both** web origins during cutover, e.g.  
      `https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app`
    - After clients point only at Woney hosts, remove the old origin and delete unused `LEDGER_*` keys.
-4. Confirm `GET https://<new-or-old-api-host>/healthz` → `status: ok`, `database: up`.
+4. Confirm `GET https://<actual-api-host>/healthz` → `status: ok`, `database: up`.
 
 **Do not** delete the managed Postgres or run a destructive Blueprint recreate — that drops data.
 
@@ -35,7 +69,8 @@ Intended hostnames after rename (adjust if your dashboard assigns a different su
 1. Project Settings → rename project to `woney-web` (or create `woney-web` and reconnect the repo).
 2. Note the production URL (may stay `ledger-web-blue.vercel.app` or become `woney-web-*.vercel.app`).
 3. Env:
-   - `NEXT_PUBLIC_API_URL` = new API host (no trailing slash), e.g. `https://woney-api-ayer.onrender.com`
+   - `NEXT_PUBLIC_API_URL` = live API host from Render (no trailing slash). Until a new
+     `woney-api-*.onrender.com` responds, keep `https://ledger-api-ayer.onrender.com`.
 4. Redeploy production.
 5. If you use a custom domain (`woney.app` etc.): point DNS / Vercel domain to the renamed project; keep the old Vercel URL in CORS until DNS propagates.
 

@@ -2,16 +2,23 @@
 # https://render.com/docs/blueprint-spec
 # Connect this GitHub repo in Render Dashboard → New → Blueprint
 #
-# Existing live services named ledger-* stay until you rename them manually
-# (see docs/hosting-rename.md). This file targets the Woney names for new/synced blueprints.
+# Blueprint tracks resources by the `name:` fields below. Renaming services only in
+# the Render Dashboard orphans them from the Blueprint until these names match again.
+# After a dashboard rename to woney-*, push this file and Manual Sync the Blueprint;
+# Render adopts existing resources when `name` matches exactly.
+#
 # Env: code reads WONEY_* primarily and still accepts LEDGER_* as aliases.
+# Env vars on the service keep working even if Blueprint-unmanaged.
+# See docs/hosting-rename.md (Blueprint re-link).
 
 databases:
   - name: woney-db
     plan: free
-    # Keep DB role/name stable for existing data; new blueprints use woney.
-    databaseName: woney
-    user: woney
+    # Keep Postgres role/db as created originally (ledger). Renaming the Render
+    # instance display name does NOT change databaseName/user. Do not switch these
+    # to woney unless you intentionally create a new empty database.
+    databaseName: ledger
+    user: ledger
 
 services:
   - type: web

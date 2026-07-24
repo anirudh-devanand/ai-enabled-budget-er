@@ -9,14 +9,18 @@ Env prefix is **`WONEY_`**. Legacy **`LEDGER_*`** names still work until you mig
 ## 1. Backend (Render Blueprint — recommended)
 
 1. Push this repo to GitHub.
-2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → select the repo.
-3. Set these secrets when prompted (or after create):
+2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → select the repo
+   (or open the existing Blueprint and **Manual Sync** after `render.yaml` changes).
+3. Blueprint resource names are `woney-api` and `woney-db` — they must match Dashboard names
+   exactly to stay managed (see [hosting-rename.md](hosting-rename.md) if you renamed in UI first).
+4. Set these secrets when prompted (or after create):
    - `WONEY_DATA_ENCRYPTION_KEY` — `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
    - `WONEY_CORS_ORIGINS` — your Vercel URL(s), e.g. `https://woney-web-blue.vercel.app` (include the old `ledger-web-*` origin during rename)
-4. Render generates `WONEY_JWT_SECRET` and `WONEY_OPS_TOKEN`.
-5. **Important:** Render Postgres connection strings use `postgres://`; the Docker entrypoint
+5. Render generates `WONEY_JWT_SECRET` and `WONEY_OPS_TOKEN`. Existing service env vars
+   (including legacy `LEDGER_*`) keep working even if Blueprint briefly shows unmanaged.
+6. **Important:** Render Postgres connection strings use `postgres://`; the Docker entrypoint
    rewrites to `postgresql+asyncpg://...` for `WONEY_DATABASE_URL` (and legacy `LEDGER_DATABASE_URL`).
-6. Confirm `https://<api-host>/healthz` returns `{"status":"ok","database":"up"}`.
+7. Confirm `https://<api-host>/healthz` returns `{"status":"ok","database":"up"}`.
 
 ### Alternative: Fly.io
 
