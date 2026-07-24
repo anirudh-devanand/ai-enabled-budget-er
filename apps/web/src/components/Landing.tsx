@@ -3,16 +3,63 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-/** Looping hero logo mark — quiet pulse/draw, no card chrome. */
+const HERO_TXNS = [
+  { name: "Loblaws", cat: "Groceries", amount: "−$64.20", tone: "out" },
+  { name: "Payroll", cat: "Income", amount: "+$2,410.00", tone: "in" },
+  { name: "Presto", cat: "Transit", amount: "−$12.50", tone: "out" },
+  { name: "Rent", cat: "Home", amount: "−$1,850.00", tone: "out" },
+] as const;
+
+/** Living product UI — balance, budget ring, cycling transaction feed. */
 function HeroScene() {
   return (
     <div className="landing-scene landing-scene--hero" aria-hidden>
-      <div className="landing-hero-logo">
-        <svg className="landing-hero-logo-ring" viewBox="0 0 160 160">
-          <circle className="landing-hero-logo-ring-track" cx="80" cy="80" r="72" />
-          <circle className="landing-hero-logo-ring-draw" cx="80" cy="80" r="72" />
-        </svg>
-        <span className="landing-hero-wordmark">Woney</span>
+      <div className="landing-hero-ambient">
+        <span className="landing-hero-orb landing-hero-orb--a" />
+        <span className="landing-hero-orb landing-hero-orb--b" />
+        <span className="landing-hero-orb landing-hero-orb--c" />
+      </div>
+
+      <div className="landing-hero-stage">
+        <div className="landing-hero-balance-card landing-hero-float">
+          <p className="landing-hero-soft-label">Available</p>
+          <p className="landing-hero-balance-amount">
+            <span className="landing-hero-balance-currency">$</span>
+            <span className="landing-hero-balance-digits">12,480</span>
+            <span className="landing-hero-balance-cents">.60</span>
+          </p>
+          <p className="landing-hero-balance-meta">Across 3 accounts · synced</p>
+        </div>
+
+        <div className="landing-hero-ring-wrap landing-hero-float landing-hero-float--delay">
+          <svg className="landing-hero-ring" viewBox="0 0 120 120">
+            <circle className="landing-hero-ring-track" cx="60" cy="60" r="48" />
+            <circle className="landing-hero-ring-progress" cx="60" cy="60" r="48" />
+          </svg>
+          <div className="landing-hero-ring-center">
+            <span className="landing-hero-ring-pct">62%</span>
+            <span className="landing-hero-ring-caption">budget left</span>
+          </div>
+        </div>
+
+        <div className="landing-hero-feed landing-hero-float landing-hero-float--delay-2">
+          <p className="landing-hero-soft-label">Recent</p>
+          <ul className="landing-hero-feed-list">
+            {HERO_TXNS.map((txn, i) => (
+              <li
+                key={txn.name}
+                className="landing-hero-feed-item"
+                style={{ ["--feed-i" as string]: String(i) }}
+              >
+                <span className="landing-hero-feed-name">{txn.name}</span>
+                <span className="landing-hero-feed-cat">{txn.cat}</span>
+                <span className={`landing-hero-feed-amt landing-hero-feed-amt--${txn.tone}`}>
+                  {txn.amount}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -129,6 +176,7 @@ export function Landing() {
       </section>
 
       <section className="landing-block" data-reveal>
+        <div className="landing-section-glow" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Bank sync</p>
           <h2 className="landing-block-title">Your Canadian accounts, in one quiet place.</h2>
@@ -143,6 +191,7 @@ export function Landing() {
       </section>
 
       <section className="landing-block landing-block-flip" data-reveal>
+        <div className="landing-section-glow landing-section-glow--cool" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Categories</p>
           <h2 className="landing-block-title">Clear labels. Less noise.</h2>
@@ -178,6 +227,7 @@ export function Landing() {
       </section>
 
       <section className="landing-block" data-reveal>
+        <div className="landing-section-glow" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Planner</p>
           <h2 className="landing-block-title">A planner that never invents the math.</h2>
@@ -199,6 +249,7 @@ export function Landing() {
       </section>
 
       <section className="landing-close" data-reveal>
+        <div className="landing-section-glow landing-section-glow--close" aria-hidden />
         <p className="landing-brand landing-brand-close">Woney</p>
         <h2 className="landing-close-title">Built for trust. Tuned for everyday use.</h2>
         <p className="landing-close-copy">Start with a calm view of your money.</p>
