@@ -179,92 +179,94 @@ function ConnectInner() {
         </div>
       </div>
 
-      <div className="segmented" role="tablist" aria-label="Connection method">
-        <button type="button" className={`seg-btn${tab === "plaid" ? " active" : ""}`} onClick={() => setTab("plaid")}>
-          Plaid Link
-        </button>
-        <button type="button" className={`seg-btn${tab === "csv" ? " active" : ""}`} onClick={() => setTab("csv")}>
-          CSV import
-        </button>
-        <button type="button" className={`seg-btn${tab === "demo" ? " active" : ""}`} onClick={() => setTab("demo")}>
-          Demo data
-        </button>
-      </div>
-
-      {status === "syncing" && (
-        <div className="toast">Pulling accounts and transactions — this can take a minute…</div>
-      )}
-      {status === "error" && error && <p className="error">{error}</p>}
-
-      {tab === "plaid" && (
-        <section className="card" style={{ marginTop: 20, padding: 28, maxWidth: 560 }}>
-          <h2 style={{ marginTop: 0 }}>Secure bank link</h2>
-          <p className="sub">
-            Works with major Canadian banks via Plaid. Woney never sees your bank password.
-            Neo is usually not on Plaid — use CSV import for that.
-          </p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!linkToken || status === "syncing"}
-            onClick={openPlaid}
-          >
-            {linkToken ? "Open Plaid Link" : "Preparing Link…"}
+      <div className="connect-flow">
+        <div className="segmented" role="tablist" aria-label="Connection method">
+          <button type="button" className={`seg-btn${tab === "plaid" ? " active" : ""}`} onClick={() => setTab("plaid")}>
+            Plaid Link
           </button>
-        </section>
-      )}
+          <button type="button" className={`seg-btn${tab === "csv" ? " active" : ""}`} onClick={() => setTab("csv")}>
+            CSV import
+          </button>
+          <button type="button" className={`seg-btn${tab === "demo" ? " active" : ""}`} onClick={() => setTab("demo")}>
+            Demo data
+          </button>
+        </div>
 
-      {tab === "csv" && (
-        <section className="card" style={{ marginTop: 20, padding: 28, maxWidth: 560 }}>
-          <h2 style={{ marginTop: 0 }}>Import a statement</h2>
-          <p className="sub">
-            Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are detected
-            automatically from common Canadian export formats.
-          </p>
-          <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
-            <label>
-              Institution
-              <input value={institutionName} onChange={(e) => setInstitutionName(e.target.value)} required />
-            </label>
-            <label>
-              Account name
-              <input value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
-            </label>
-            <label>
-              Account type
-              <select value={accountType} onChange={(e) => setAccountType(e.target.value)}>
-                <option value="chequing">Chequing</option>
-                <option value="savings">Savings</option>
-                <option value="credit">Credit</option>
-              </select>
-            </label>
-            <label>
-              CSV file
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
-              />
-            </label>
-            <button type="submit" className="btn btn-primary" disabled={!file || status === "syncing"}>
-              Import statement
+        {status === "syncing" && (
+          <div className="toast">Pulling accounts and transactions — this can take a minute…</div>
+        )}
+        {status === "error" && error && <p className="error">{error}</p>}
+
+        {tab === "plaid" && (
+          <section className="card connect-card">
+            <h2>Secure bank link</h2>
+            <p className="sub">
+              Works with major Canadian banks via Plaid. Woney never sees your bank password.
+              Neo is usually not on Plaid — use CSV import for that.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!linkToken || status === "syncing"}
+              onClick={openPlaid}
+            >
+              {linkToken ? "Open Plaid Link" : "Preparing Link…"}
             </button>
-          </form>
-        </section>
-      )}
+          </section>
+        )}
 
-      {tab === "demo" && (
-        <section className="card" style={{ marginTop: 20, padding: 28, maxWidth: 560 }}>
-          <h2 style={{ marginTop: 0 }}>Demo Scotiabank history</h2>
-          <p className="sub">
-            Seeds synthetic CAD accounts and ~180 days of transactions for QA — no Plaid keys required.
-          </p>
-          <button type="button" className="btn btn-primary" disabled={status === "syncing"} onClick={onDemo}>
-            Load demo data
-          </button>
-        </section>
-      )}
+        {tab === "csv" && (
+          <section className="card connect-card">
+            <h2>Import a statement</h2>
+            <p className="sub">
+              Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are detected
+              automatically from common Canadian export formats.
+            </p>
+            <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
+              <label>
+                Institution
+                <input value={institutionName} onChange={(e) => setInstitutionName(e.target.value)} required />
+              </label>
+              <label>
+                Account name
+                <input value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
+              </label>
+              <label>
+                Account type
+                <select value={accountType} onChange={(e) => setAccountType(e.target.value)}>
+                  <option value="chequing">Chequing</option>
+                  <option value="savings">Savings</option>
+                  <option value="credit">Credit</option>
+                </select>
+              </label>
+              <label>
+                CSV file
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  required
+                />
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={!file || status === "syncing"}>
+                Import statement
+              </button>
+            </form>
+          </section>
+        )}
+
+        {tab === "demo" && (
+          <section className="card connect-card">
+            <h2>Demo Scotiabank history</h2>
+            <p className="sub">
+              Seeds synthetic CAD accounts and ~180 days of transactions for QA — no Plaid keys required.
+            </p>
+            <button type="button" className="btn btn-primary" disabled={status === "syncing"} onClick={onDemo}>
+              Load demo data
+            </button>
+          </section>
+        )}
+      </div>
     </AppShell>
   );
 }
