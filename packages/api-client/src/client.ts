@@ -8,7 +8,10 @@ import type {
   ConversationResponse,
   DeleteConfirmRequest,
   DeleteRequestResponse,
+  CashFlowPoint,
+  GoalCreateInput,
   GoalResponse,
+  GoalUpdateInput,
   HouseholdDetailResponse,
   HouseholdResponse,
   LoginResponse,
@@ -18,6 +21,7 @@ import type {
   NamedAmount,
   NetWorthResponse,
   OAuthProvider,
+  PeriodSummary,
   PlanResponse,
   TokenPair,
   TransactionCorrectionResponse,
@@ -529,6 +533,33 @@ export class WoneyClient {
     );
   }
 
+  getIncomeByCategory(householdId: string, days = 30) {
+    return this.request<NamedAmount[]>(
+      "GET",
+      `/v1/metrics/income-by-category?household_id=${householdId}&days=${days}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  getCashFlow(householdId: string, days = 90) {
+    return this.request<CashFlowPoint[]>(
+      "GET",
+      `/v1/metrics/cash-flow?household_id=${householdId}&days=${days}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  getPeriodSummary(householdId: string, days = 30) {
+    return this.request<PeriodSummary>(
+      "GET",
+      `/v1/metrics/period-summary?household_id=${householdId}&days=${days}`,
+      undefined,
+      { auth: true },
+    );
+  }
+
   // --- goals & planner ---
 
   createGoal(
@@ -536,6 +567,7 @@ export class WoneyClient {
     name: string,
     targetAmount: string,
     targetDate?: string,
+    extras?: Partial<GoalCreateInput>,
   ) {
     return this.request<GoalResponse>(
       "POST",
@@ -543,9 +575,14 @@ export class WoneyClient {
       {
         household_id: householdId,
         name,
-        type: "save",
+        type: extras?.type ?? "save",
         target_amount: targetAmount,
-        target_date: targetDate ?? null,
+        current_amount: extras?.current_amount ?? "0",
+        target_date: targetDate ?? extras?.target_date ?? null,
+        start_date: extras?.start_date ?? null,
+        notes: extras?.notes ?? null,
+        priority: extras?.priority ?? "medium",
+        currency: extras?.currency ?? "CAD",
       },
       { auth: true },
     );
@@ -558,6 +595,27 @@ export class WoneyClient {
       undefined,
       { auth: true },
     );
+  }
+
+  updateGoal(goalId: string, body: GoalUpdateInput) {
+    return this.request<GoalResponse>("PATCH", `/v1/goals/${goalId}`, body, {
+      auth: true,
+    });
+  }
+
+  contributeToGoal(goalId: string, amount: string) {
+    return this.request<GoalResponse>(
+      "POST",
+      `/v1/goals/${goalId}/contribute`,
+      { amount },
+      { auth: true },
+    );
+  }
+
+  deleteGoal(goalId: string) {
+    return this.request<void>("DELETE", `/v1/goals/${goalId}`, undefined, {
+      auth: true,
+    });
   }
 
   buildPlan(goalId: string) {

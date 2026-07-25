@@ -38,6 +38,14 @@ class NamedAmount(BaseModel):
     merchant_id: uuid.UUID | None = None
 
 
+class PeriodSummaryResponse(BaseModel):
+    days: int
+    income_total: Decimal
+    spending_total: Decimal
+    net: Decimal
+    currency: str
+
+
 async def _guard(db: AsyncSession, user: User, household_id: uuid.UUID) -> None:
     if not await user_in_household(db, user.id, household_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
@@ -61,6 +69,17 @@ async def get_cash_flow(
     return await service.cash_flow(db, household_id, days)
 
 
+@router.get("/period-summary", response_model=PeriodSummaryResponse)
+async def get_period_summary(
+    household_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbDep,
+    days: Annotated[int, Query(ge=7, le=365)] = 30,
+):
+    await _guard(db, user, household_id)
+    return PeriodSummaryResponse(**await service.period_summary(db, household_id, days))
+
+
 @router.get("/spending-by-category")
 async def get_spending_by_category(
     household_id: uuid.UUID,
@@ -70,6 +89,17 @@ async def get_spending_by_category(
 ):
     await _guard(db, user, household_id)
     return await service.spending_by_category(db, household_id, days)
+
+
+@router.get("/income-by-category")
+async def get_income_by_category(
+    household_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbDep,
+    days: Annotated[int, Query(ge=7, le=365)] = 30,
+):
+    await _guard(db, user, household_id)
+    return await service.income_by_category(db, household_id, days)
 
 
 @router.get("/spending-by-merchant")

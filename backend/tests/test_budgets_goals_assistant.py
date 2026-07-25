@@ -95,6 +95,24 @@ async def test_metrics_net_worth_and_spending(client, register_payload):
     assert cats.status_code == 200
     assert any(c["name"] == "Dining & Takeout" for c in cats.json())
 
+    income = await client.get(
+        f"/v1/metrics/income-by-category?household_id={household_id}", headers=headers
+    )
+    assert income.status_code == 200
+
+    summary = await client.get(
+        f"/v1/metrics/period-summary?household_id={household_id}&days=30", headers=headers
+    )
+    assert summary.status_code == 200
+    assert Decimal(summary.json()["income_total"]) >= Decimal("3000")
+    assert Decimal(summary.json()["spending_total"]) >= Decimal("12")
+
+    flow = await client.get(
+        f"/v1/metrics/cash-flow?household_id={household_id}&days=30", headers=headers
+    )
+    assert flow.status_code == 200
+    assert isinstance(flow.json(), list)
+
     sankey = await client.get(f"/v1/metrics/sankey?household_id={household_id}", headers=headers)
     assert sankey.status_code == 200
     assert "nodes" in sankey.json()
@@ -111,11 +129,35 @@ async def test_goal_plan_and_scenario(client, register_payload):
             "target_amount": "6000",
             "current_amount": "500",
             "target_date": "2026-12-31",
+            "start_date": "2026-01-01",
+            "notes": "3 months of expenses",
+            "priority": "high",
         },
         headers=headers,
     )
     assert resp.status_code == 201, resp.text
-    goal_id = resp.json()["id"]
+    body = resp.json()
+    goal_id = body["id"]
+    assert body["notes"] == "3 months of expenses"
+    assert body["priority"] == "high"
+    assert "progress_pct" in body
+    assert Decimal(body["remaining"]) == Decimal("5500.00")
+
+    patched = await client.patch(
+        f"/v1/goals/{goal_id}",
+        json={"notes": "Updated note", "priority": "medium"},
+        headers=headers,
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["notes"] == "Updated note"
+
+    contrib = await client.post(
+        f"/v1/goals/{goal_id}/contribute",
+        json={"amount": "250"},
+        headers=headers,
+    )
+    assert contrib.status_code == 200, contrib.text
+    assert Decimal(contrib.json()["current_amount"]) == Decimal("750.00")
 
     plan = await client.post(f"/v1/goals/{goal_id}/plan", headers=headers)
     assert plan.status_code == 200, plan.text
@@ -129,6 +171,12 @@ async def test_goal_plan_and_scenario(client, register_payload):
     )
     assert scenario.status_code == 200
     assert "scenario_surplus" in scenario.json()
+
+    deleted = await client.delete(f"/v1/goals/{goal_id}", headers=headers)
+    assert deleted.status_code == 204
+    listed = await client.get(f"/v1/goals/?household_id={household_id}", headers=headers)
+    assert listed.status_code == 200
+    assert all(g["id"] != goal_id for g in listed.json())
 
 
 async def test_assistant_offline_chat(client, register_payload):

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type {
   AccountResponse,
+  GoalResponse,
   HouseholdResponse,
   TransactionResponse,
   UserResponse,
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [household, setHousehold] = useState<HouseholdResponse | null>(null);
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
+  const [goals, setGoals] = useState<GoalResponse[]>([]);
 
   const load = useCallback(async () => {
     const [me, households] = await Promise.all([api.me(), api.listHouseholds()]);
@@ -28,12 +30,14 @@ export default function DashboardPage() {
     const first = households[0] ?? null;
     setHousehold(first);
     if (first) {
-      const [accs, txns] = await Promise.all([
+      const [accs, txns, gs] = await Promise.all([
         api.listAccounts(first.id),
         api.listTransactions(first.id, 12),
+        api.listGoals(first.id).catch(() => [] as GoalResponse[]),
       ]);
       setAccounts(accs);
       setTransactions(txns.items);
+      setGoals(gs.filter((g) => g.status === "active").slice(0, 2));
     }
   }, []);
 
@@ -71,6 +75,45 @@ export default function DashboardPage() {
           {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
         </div>
       </div>
+
+      {goals.length > 0 && (
+        <>
+          <div className="section-title" style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Goals</span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+              onClick={() => router.push("/goals")}
+            >
+              View all
+            </button>
+          </div>
+          <div className="dash-goals">
+            {goals.map((g) => (
+              <button
+                type="button"
+                key={g.id}
+                className="dash-goal-card"
+                onClick={() => router.push("/goals")}
+              >
+                <div className="dash-goal-head">
+                  <span>{g.name}</span>
+                  <span className="muted">{Math.round(g.progress_pct ?? 0)}%</span>
+                </div>
+                <div className="dash-goal-bar">
+                  <div style={{ width: `${Math.min(100, g.progress_pct ?? 0)}%` }} />
+                </div>
+                <div className="muted" style={{ marginTop: 8, fontSize: "0.85rem" }}>
+                  {formatMoney(g.current_amount, g.currency)} /{" "}
+                  {formatMoney(g.target_amount, g.currency)}
+                  {g.target_date ? ` · by ${g.target_date}` : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="grid">
         {accounts.map((a) => (

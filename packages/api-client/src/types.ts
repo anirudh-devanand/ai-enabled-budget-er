@@ -169,15 +169,69 @@ export interface BudgetDetailResponse extends BudgetResponse {
   categories: BudgetCategoryStatus[];
 }
 
+export type GoalType = "save" | "debt_payoff" | "emergency_fund" | "custom";
+export type GoalPriority = "low" | "medium" | "high";
+export type GoalStatus = "active" | "paused" | "completed";
+
 export interface GoalResponse {
   id: string;
   household_id: string;
   name: string;
-  type: string;
+  type: GoalType | string;
   target_amount: string;
   current_amount: string;
   target_date: string | null;
-  status: string;
+  start_date: string | null;
+  notes: string | null;
+  priority: GoalPriority | string;
+  currency: string;
+  status: GoalStatus | string;
+  progress_pct: number;
+  remaining: string;
+  days_left: number | null;
+  monthly_needed: string;
+  on_track: boolean | null;
+}
+
+export interface GoalCreateInput {
+  household_id: string;
+  name: string;
+  type?: GoalType | string;
+  target_amount: string;
+  current_amount?: string;
+  target_date?: string | null;
+  start_date?: string | null;
+  notes?: string | null;
+  priority?: GoalPriority | string;
+  currency?: string;
+}
+
+export interface GoalUpdateInput {
+  name?: string;
+  type?: GoalType | string;
+  target_amount?: string;
+  current_amount?: string;
+  target_date?: string | null;
+  start_date?: string | null;
+  notes?: string | null;
+  priority?: GoalPriority | string;
+  status?: GoalStatus | string;
+  currency?: string;
+}
+
+export interface CashFlowPoint {
+  date: string;
+  income: string;
+  spending: string;
+  net: string;
+}
+
+export interface PeriodSummary {
+  days: number;
+  income_total: string;
+  spending_total: string;
+  net: string;
+  currency: string;
 }
 
 export interface PlanItemResponse {

@@ -46,6 +46,30 @@ async def category_spend_map(
     return {slug: abs(Decimal(total or 0)) for slug, total in result.all()}
 
 
+def goal_progress_fields(goal: Goal, monthly_surplus: Decimal | None = None) -> dict:
+    """Computed progress fields for API responses."""
+    target = quantize_money(goal.target_amount)
+    current = quantize_money(goal.current_amount)
+    remaining = quantize_money(max(Decimal("0"), target - current))
+    progress_pct = float(
+        min(Decimal("100"), (current / target * Decimal("100")) if target > 0 else Decimal("0"))
+    )
+    today = date.today()
+    days_left: int | None = None
+    if goal.target_date:
+        days_left = (goal.target_date - today).days
+
+    surplus = monthly_surplus if monthly_surplus is not None else Decimal("0")
+    projection = project_goal(target, current, goal.target_date, surplus, today)
+    return {
+        "progress_pct": round(progress_pct, 1),
+        "remaining": remaining,
+        "days_left": days_left,
+        "monthly_needed": projection.monthly_needed,
+        "on_track": projection.on_track if remaining > 0 else True,
+    }
+
+
 async def create_goal(
     db: AsyncSession,
     household_id: uuid.UUID,
@@ -54,19 +78,93 @@ async def create_goal(
     target_amount: Decimal,
     target_date: date | None,
     current_amount: Decimal = Decimal("0"),
+    *,
+    start_date: date | None = None,
+    notes: str | None = None,
+    priority: str = "medium",
+    currency: str = "CAD",
 ) -> Goal:
     goal = Goal(
         household_id=household_id,
         name=name,
         type=goal_type,
-        target_amount=target_amount,
-        current_amount=current_amount,
+        target_amount=quantize_money(target_amount),
+        current_amount=quantize_money(current_amount),
         target_date=target_date,
+        start_date=start_date or date.today(),
+        notes=notes,
+        priority=priority,
+        currency=currency or "CAD",
     )
     db.add(goal)
     await db.commit()
     await db.refresh(goal)
     return goal
+
+
+async def update_goal(
+    db: AsyncSession,
+    goal: Goal,
+    *,
+    name: str | None = None,
+    goal_type: str | None = None,
+    target_amount: Decimal | None = None,
+    current_amount: Decimal | None = None,
+    target_date: date | None | object = ...,
+    start_date: date | None | object = ...,
+    notes: str | None | object = ...,
+    priority: str | None = None,
+    status: str | None = None,
+    currency: str | None = None,
+) -> Goal:
+    if name is not None:
+        goal.name = name
+    if goal_type is not None:
+        goal.type = goal_type
+    if target_amount is not None:
+        goal.target_amount = quantize_money(target_amount)
+    if current_amount is not None:
+        goal.current_amount = quantize_money(current_amount)
+    if target_date is not ...:
+        goal.target_date = target_date  # type: ignore[assignment]
+    if start_date is not ...:
+        goal.start_date = start_date  # type: ignore[assignment]
+    if notes is not ...:
+        goal.notes = notes  # type: ignore[assignment]
+    if priority is not None:
+        goal.priority = priority
+    if status is not None:
+        goal.status = status
+    if currency is not None:
+        goal.currency = currency
+    if goal.current_amount >= goal.target_amount and goal.status == "active":
+        goal.status = "completed"
+        goal.current_amount = goal.target_amount
+    await db.commit()
+    await db.refresh(goal)
+    return goal
+
+
+async def contribute_to_goal(
+    db: AsyncSession, goal: Goal, amount: Decimal
+) -> Goal:
+    amount = quantize_money(amount)
+    if amount <= 0:
+        raise ValueError("Contribution must be positive")
+    new_current = quantize_money(goal.current_amount + amount)
+    if new_current >= goal.target_amount:
+        goal.current_amount = goal.target_amount
+        goal.status = "completed"
+    else:
+        goal.current_amount = new_current
+    await db.commit()
+    await db.refresh(goal)
+    return goal
+
+
+async def delete_goal(db: AsyncSession, goal: Goal) -> None:
+    await db.delete(goal)
+    await db.commit()
 
 
 async def generate_plan(db: AsyncSession, goal: Goal) -> Plan:

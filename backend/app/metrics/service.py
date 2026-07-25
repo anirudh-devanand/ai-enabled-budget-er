@@ -87,6 +87,56 @@ async def spending_by_category(
     ]
 
 
+async def income_by_category(
+    db: AsyncSession, household_id: uuid.UUID, days: int = 30
+) -> list[dict]:
+    start = date.today() - timedelta(days=days)
+    result = await db.execute(
+        select(Category.id, Category.name, func.sum(Transaction.amount))
+        .join(TransactionEnrichment, TransactionEnrichment.category_id == Category.id)
+        .join(Transaction, Transaction.id == TransactionEnrichment.transaction_id)
+        .join(Account, Account.id == Transaction.account_id)
+        .join(BankConnection, BankConnection.id == Account.connection_id)
+        .where(
+            BankConnection.household_id == household_id,
+            Transaction.date >= start,
+            Transaction.amount > 0,
+        )
+        .group_by(Category.id, Category.name)
+        .order_by(func.sum(Transaction.amount).desc())
+    )
+    return [
+        {"category_id": cid, "name": name, "amount": Decimal(total or 0)}
+        for cid, name, total in result.all()
+    ]
+
+
+async def period_summary(
+    db: AsyncSession, household_id: uuid.UUID, days: int = 30
+) -> dict:
+    """Income / spending / net totals for the period (all txns, not only categorized)."""
+    start = date.today() - timedelta(days=days)
+    result = await db.execute(
+        select(
+            func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), 0),
+            func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount < 0), 0),
+        )
+        .join(Account, Account.id == Transaction.account_id)
+        .join(BankConnection, BankConnection.id == Account.connection_id)
+        .where(BankConnection.household_id == household_id, Transaction.date >= start)
+    )
+    income, spend = result.one()
+    income_total = Decimal(income or 0)
+    spending_total = abs(Decimal(spend or 0))
+    return {
+        "days": days,
+        "income_total": income_total,
+        "spending_total": spending_total,
+        "net": income_total - spending_total,
+        "currency": "CAD",
+    }
+
+
 async def spending_by_merchant(
     db: AsyncSession, household_id: uuid.UUID, days: int = 30, limit: int = 20
 ) -> list[dict]:

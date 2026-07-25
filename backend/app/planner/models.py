@@ -22,6 +22,10 @@ class Goal(Base):
     target_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     current_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     target_date: Mapped[date | None] = mapped_column(Date, default=None)
+    start_date: Mapped[date | None] = mapped_column(Date, default=None)
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+    currency: Mapped[str] = mapped_column(String(3), default="CAD")
     status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

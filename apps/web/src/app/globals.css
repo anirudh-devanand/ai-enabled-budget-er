@@ -2462,3 +2462,270 @@ textarea:-webkit-autofill:focus {
     transform: none;
   }
 }
+
+/* --- Insights & Goals --- */
+.insight-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.insight-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+
+.insight-stat .label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.insight-stat .amount {
+  margin-top: 8px;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.insight-stat .amount.positive {
+  color: #7d9a7c;
+}
+
+.insight-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.chart-tile {
+  margin-top: 16px;
+}
+
+.chart-frame {
+  margin-top: 16px;
+  width: 100%;
+  min-height: 200px;
+}
+
+.goal-form {
+  margin-bottom: 24px;
+  max-width: 720px;
+}
+
+.goal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 14px 0 18px;
+}
+
+.goal-form textarea {
+  width: 100%;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.goal-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.muted-pill {
+  color: var(--muted);
+}
+
+.ok-pill {
+  background: rgba(125, 154, 124, 0.18);
+  color: #9bb89a;
+}
+
+.warn-pill {
+  background: rgba(196, 164, 132, 0.2);
+  color: #d2b48c;
+}
+
+.goal-notes {
+  margin-top: 6px;
+  max-width: 36ch;
+}
+
+.goal-target {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.goal-timeline {
+  margin-top: 18px;
+}
+
+.goal-timeline-track {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  margin: 10px 4px 8px;
+}
+
+.goal-timeline-track .dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  transform: translate(-50%, -50%);
+}
+
+.goal-timeline-track .dot.start {
+  left: 0;
+}
+
+.goal-timeline-track .dot.today {
+  left: 50%;
+  background: var(--muted);
+}
+
+.goal-timeline-track .dot.end {
+  left: 100%;
+}
+
+.goal-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.goal-contribute {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.goal-contribute input {
+  flex: 1;
+}
+
+.goal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.goal-plan {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.goal-plan h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.goal-plan ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.goal-plan li {
+  margin-bottom: 6px;
+}
+
+.dash-goals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dash-goal-card {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px 18px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dash-goal-card:hover {
+  border-color: var(--border-strong);
+}
+
+.dash-goal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.dash-goal-bar {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.dash-goal-bar > div {
+  height: 100%;
+  background: var(--text);
+  border-radius: 999px;
+}
+
+@media (max-width: 900px) {
+  .insight-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .insight-split,
+  .goal-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .insight-summary {
+    grid-template-columns: 1fr;
+  }
+}
