@@ -6,6 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assistant.models import Conversation, Message
 from app.assistant.offline import format_offline_reply
+from app.assistant.privacy import (
+    PRIVACY_SYSTEM_ADDENDUM,
+    cap_history,
+    redact_user_text,
+    sanitize_for_llm,
+    sanitize_tool_result_json,
+)
 from app.assistant.tools import TOOL_SPECS, run_tool
 from app.connections.service import user_in_household
 from app.core.llm import LlmClient, LlmMessage, NullLlmClient, get_llm_client
@@ -18,6 +25,7 @@ SYSTEM_PROMPT = (
     "securities recommendations. Keep answers concise and cite numbers from tool results. "
     "You may include a chart hint as JSON on its own line like "
     'CHART:{"type":"bar","title":"...","data":[{"label":"x","value":1}]} when useful.'
+    + PRIVACY_SYSTEM_ADDENDUM
 )
 
 
@@ -74,7 +82,8 @@ async def chat(
     llm: LlmClient | None = None,
 ) -> Message:
     """Append a user message, run the LLM tool loop, return the assistant message."""
-    db.add(Message(conversation_id=conversation.id, role="user", content=user_text))
+    safe_user_text = redact_user_text(user_text)
+    db.add(Message(conversation_id=conversation.id, role="user", content=safe_user_text))
     await db.flush()
 
     llm = llm if llm is not None else get_llm_client()
@@ -83,20 +92,32 @@ async def chat(
     for m in history:
         if m.role in ("user", "assistant"):
             messages.append(LlmMessage(role=m.role, content=m.content))
+    messages = cap_history(messages)
 
     # Offline / no-key path: deterministic tool-backed natural language answer.
     if isinstance(llm, NullLlmClient):
-        return await _offline_reply(db, conversation, user_text)
+        return await _offline_reply(db, conversation, safe_user_text)
 
-    # Tool loop (max 4 rounds). Any LLM failure falls back so Send never 500s.
+    # Tool loop (max 4 rounds). Any LLM / sanitize failure falls back offline.
     try:
         for _ in range(4):
-            response = await llm.complete(messages, tools=TOOL_SPECS)
+            try:
+                outbound = sanitize_for_llm(messages)
+            except Exception:
+                logger.exception(
+                    "sanitize_for_llm failed; offline fallback conversation=%s",
+                    conversation.id,
+                )
+                return await _offline_reply(db, conversation, safe_user_text)
+
+            response = await llm.complete(outbound, tools=TOOL_SPECS)
             if response.tool_calls:
                 for call in response.tool_calls:
                     result = await run_tool(
                         db, conversation.household_id, call.name, call.arguments
                     )
+                    # Defense in depth if tools ever return raw JSON
+                    result = sanitize_tool_result_json(call.name, result)
                     db.add(
                         Message(
                             conversation_id=conversation.id,
@@ -137,4 +158,4 @@ async def chat(
             "LLM assistant chat failed; falling back to offline reply for conversation %s",
             conversation.id,
         )
-        return await _offline_reply(db, conversation, user_text)
+        return await _offline_reply(db, conversation, safe_user_text)

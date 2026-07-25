@@ -143,10 +143,10 @@ class AnthropicLlmClient:
 
 def get_llm_client() -> LlmClient:
     settings = get_settings()
-    if not settings.llm_api_key:
+    if not settings.llm_outbound_enabled:
         return NullLlmClient()
     if settings.llm_provider == "anthropic":
-        return AnthropicLlmClient(settings.llm_api_key, settings.llm_model)
+        return AnthropicLlmClient(settings.llm_api_key or "", settings.llm_model)
     # OpenAI-compatible fallback via Anthropic-shaped client is intentionally
     # not implemented yet; null keeps the app functional without keys.
     logger.warning("Unknown LLM provider %s; using null client", settings.llm_provider)

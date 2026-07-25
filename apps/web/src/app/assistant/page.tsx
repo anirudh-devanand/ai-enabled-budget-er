@@ -76,7 +76,10 @@ export default function AssistantPage() {
       <div className="page-header">
         <div>
           <h1>Assistant</h1>
-          <p>Ask about spending, budgets, or goals — answers grounded in your data.</p>
+          <p>
+            Ask about spending, budgets, or goals — answers use privacy-filtered
+            summaries from your data. Full account numbers are never sent to the AI.
+          </p>
         </div>
       </div>
 

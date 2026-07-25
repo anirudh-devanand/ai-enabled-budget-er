@@ -120,8 +120,9 @@ def format_offline_reply(question: str, spending_json: str, net_json: str) -> st
         if accounts:
             lines.append("Accounts:")
             for a in accounts:
+                label = a.get("display_name") or a.get("name") or "Account"
                 lines.append(
-                    f"· {a.get('name')}: {_money(a.get('balance'), currency)} ({a.get('type')})"
+                    f"· {label}: {_money(a.get('balance'), currency)} ({a.get('type')})"
                 )
     else:
         # General / spending overview

@@ -217,7 +217,10 @@ export default function AccountPage() {
       <div className="page-header">
         <div>
           <h1>Account</h1>
-          <p>Profile, linked banks, and category styling.</p>
+          <p>
+            Profile, linked banks, and category styling. The Assistant uses
+            privacy-filtered summaries — full account numbers are never sent to the AI.
+          </p>
         </div>
         {householdId && (
           <div className="page-actions">

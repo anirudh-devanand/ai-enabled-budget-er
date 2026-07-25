@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-20250514"
     embedding_match_threshold: float = 0.72
     llm_enrichment_min_confidence: float = 0.7
+    # Assistant privacy: strict (default) redacts PII before public LLM calls.
+    # Set WONEY_LLM_PRIVACY_MODE=off only for local debugging.
+    llm_privacy_mode: str = "strict"  # strict | off
+    # Force offline tools-only assistant (no Anthropic/OpenAI) when false.
+    llm_enabled: bool = True
 
     # SSO / OAuth (optional — buttons show as available when set).
     google_oauth_client_id: str | None = None
@@ -160,6 +165,15 @@ class Settings(BaseSettings):
     @property
     def plaid_configured(self) -> bool:
         return bool(self.plaid_client_id and self.plaid_secret)
+
+    @property
+    def llm_privacy_strict(self) -> bool:
+        return (self.llm_privacy_mode or "strict").strip().lower() != "off"
+
+    @property
+    def llm_outbound_enabled(self) -> bool:
+        """True when a key is set AND llm_enabled allows public AI calls."""
+        return bool(self.llm_api_key) and bool(self.llm_enabled)
 
     @property
     def google_oauth_configured(self) -> bool:
