@@ -8,18 +8,25 @@ import {
   Text,
   View,
 } from "react-native";
-import type { AccountResponse, HouseholdResponse, TransactionResponse } from "@woney/api-client";
+import type {
+  AccountResponse,
+  GoalResponse,
+  HouseholdResponse,
+  TransactionResponse,
+} from "@woney/api-client";
 import { api } from "../api";
 import { CategoryIcon } from "../components/ui";
 import { colors, money } from "../theme";
 
 type Props = {
   onOpenConnect: () => void;
+  onOpenGoals: () => void;
 };
 
-export function HomeScreen({ onOpenConnect }: Props) {
+export function HomeScreen({ onOpenConnect, onOpenGoals }: Props) {
   const [household, setHousehold] = useState<HouseholdResponse | null>(null);
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+  const [goals, setGoals] = useState<GoalResponse[]>([]);
   const [txns, setTxns] = useState<TransactionResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
@@ -32,15 +39,18 @@ export function HomeScreen({ onOpenConnect }: Props) {
       setHousehold(first);
       if (!first) {
         setAccounts([]);
+        setGoals([]);
         setTxns([]);
         return;
       }
-      const [accs, list] = await Promise.all([
+      const [accs, list, gs] = await Promise.all([
         api.listAccounts(first.id),
         api.listTransactions(first.id, 12),
+        api.listGoals(first.id).catch(() => [] as GoalResponse[]),
       ]);
       setAccounts(accs);
       setTxns(list.items);
+      setGoals(gs.filter((g) => g.status === "active").slice(0, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -78,6 +88,35 @@ export function HomeScreen({ onOpenConnect }: Props) {
           {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
         </Text>
       </View>
+
+      {goals.length > 0 && (
+        <View style={styles.goalsBlock}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.h2Inline}>Goals</Text>
+            <Pressable onPress={onOpenGoals} hitSlop={8}>
+              <Text style={styles.link}>View all</Text>
+            </Pressable>
+          </View>
+          {goals.map((g) => {
+            const pct = Math.min(100, g.progress_pct ?? 0);
+            return (
+              <Pressable style={styles.goalCard} key={g.id} onPress={onOpenGoals}>
+                <View style={styles.goalHead}>
+                  <Text style={styles.title}>{g.name}</Text>
+                  <Text style={styles.muted}>{Math.round(pct)}%</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pct}%` }]} />
+                </View>
+                <Text style={styles.goalMeta}>
+                  {money(g.current_amount, g.currency)} / {money(g.target_amount, g.currency)}
+                  {g.target_date ? ` · by ${g.target_date}` : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {accounts.length === 0 && (
         <Pressable style={styles.button} onPress={onOpenConnect}>
@@ -138,6 +177,7 @@ const styles = StyleSheet.create({
   h1: { color: colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
   lede: { color: colors.muted, marginBottom: 16, marginTop: 2 },
   h2: { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 22, marginBottom: 10 },
+  h2Inline: { color: colors.text, fontSize: 16, fontWeight: "700" },
   hero: {
     backgroundColor: colors.goldDeep,
     borderRadius: 20,
@@ -155,6 +195,38 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   heroMeta: { color: "rgba(232,213,163,0.9)", marginTop: 8, fontSize: 13 },
+  goalsBlock: {
+    marginBottom: 28,
+  },
+  sectionHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  link: { color: colors.muted, fontWeight: "600", fontSize: 13 },
+  goalCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 12,
+  },
+  goalHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  barTrack: {
+    height: 6,
+    borderRadius: 5,
+    backgroundColor: colors.border,
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  barFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 5 },
+  goalMeta: { color: colors.muted, marginTop: 8, fontSize: 13 },
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,

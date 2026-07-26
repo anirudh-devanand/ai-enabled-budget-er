@@ -169,12 +169,12 @@ const styles = StyleSheet.create({
   item: { color: colors.text, marginTop: 6, fontSize: 13 },
   barTrack: {
     height: 6,
-    borderRadius: 999,
+    borderRadius: 5,
     backgroundColor: colors.border,
     marginTop: 12,
     overflow: "hidden",
   },
-  barFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 999 },
+  barFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 5 },
   button: {
     backgroundColor: colors.accent,
     borderRadius: 999,

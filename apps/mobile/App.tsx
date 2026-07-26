@@ -233,7 +233,12 @@ export default function App() {
         </Pressable>
       </View>
       <View style={styles.body}>
-        {tab === "home" && <HomeScreen onOpenConnect={() => setTab("connect")} />}
+        {tab === "home" && (
+          <HomeScreen
+            onOpenConnect={() => setTab("connect")}
+            onOpenGoals={() => setTab("goals")}
+          />
+        )}
         {tab === "txns" && <TransactionsScreen />}
         {tab === "budgets" && <BudgetsScreen />}
         {tab === "goals" && <GoalsScreen />}

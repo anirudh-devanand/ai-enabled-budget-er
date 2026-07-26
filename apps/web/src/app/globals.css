@@ -678,7 +678,8 @@ textarea {
 }
 
 button.tile,
-button.account-card {
+button.account-card,
+button.dash-goal-card {
   appearance: none;
   -webkit-appearance: none;
   font: inherit;
@@ -739,7 +740,7 @@ button.account-card {
 }
 
 .section-title {
-  margin: 32px 0 12px;
+  margin: 32px 0 20px;
   font-size: 1.05rem;
   font-weight: 700;
 }
@@ -1018,7 +1019,7 @@ button.account-card {
   letter-spacing: -0.02em;
 }
 .shell header button,
-button:not(.btn):not(.primary):not(.account-card):not(.cat-icon):not(.sso-btn):not(.seg-btn):not(.theme-toggle) {
+button:not(.btn):not(.primary):not(.account-card):not(.dash-goal-card):not(.cat-icon):not(.sso-btn):not(.seg-btn):not(.theme-toggle) {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   color: var(--text);
@@ -2675,14 +2676,14 @@ textarea:-webkit-autofill:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 28px;
 }
 
 .dash-goal-card {
   text-align: left;
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 16px 18px;
   color: inherit;
   cursor: pointer;
@@ -2702,7 +2703,7 @@ textarea:-webkit-autofill:focus {
 .dash-goal-bar {
   margin-top: 12px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 5px;
   background: var(--border);
   overflow: hidden;
 }
@@ -2710,7 +2711,7 @@ textarea:-webkit-autofill:focus {
 .dash-goal-bar > div {
   height: 100%;
   background: var(--text);
-  border-radius: 999px;
+  border-radius: 5px;
 }
 
 @media (max-width: 900px) {
