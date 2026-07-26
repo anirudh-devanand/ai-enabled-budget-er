@@ -23,12 +23,14 @@ ProviderDep = Annotated[BankProvider, Depends(get_provider)]
 
 
 def require_ops_token(x_ops_token: Annotated[str | None, Header()] = None) -> None:
+    """Fail closed: ops routes always require a configured token."""
     settings = get_settings()
     expected = settings.ops_token
     if not expected:
-        if settings.env == "production":
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Ops token not configured")
-        return
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Ops token not configured (set WONEY_OPS_TOKEN)",
+        )
     if not x_ops_token or not secrets.compare_digest(x_ops_token, expected):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid ops token")
 

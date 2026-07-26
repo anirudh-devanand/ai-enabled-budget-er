@@ -11,6 +11,7 @@ from app.budgets.router import router as budgets_router
 from app.connections.router import router as connections_router
 from app.core.config import get_settings
 from app.core.database import get_engine
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.enrichment.router import categories_router, transactions_router
 from app.households.router import router as households_router
 from app.metrics.router import router as metrics_router
@@ -36,6 +37,7 @@ app = FastAPI(
 )
 
 origins = settings.cors_origin_list()
+# Last added = outermost. Security headers should wrap CORS responses.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins if origins else ["*"],
@@ -43,6 +45,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(auth_router)
 app.include_router(users_router)

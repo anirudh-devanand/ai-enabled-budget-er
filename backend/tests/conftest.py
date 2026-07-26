@@ -3,6 +3,7 @@ import os
 # Configure before app imports read settings.
 os.environ["WONEY_DATABASE_URL"] = "sqlite+aiosqlite://"
 os.environ["WONEY_JWT_SECRET"] = "test-secret"
+os.environ["WONEY_OPS_TOKEN"] = "test-ops-token"
 
 import pytest
 import pytest_asyncio
@@ -11,7 +12,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.rate_limit import reset_rate_limits_for_tests
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limits():
+    reset_rate_limits_for_tests()
+    yield
+    reset_rate_limits_for_tests()
 
 
 @pytest_asyncio.fixture

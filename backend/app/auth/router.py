@@ -23,6 +23,7 @@ from app.auth.schemas import (
 )
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.rate_limit import check_rate_limit
 from app.core.security import (
     MFA_CHALLENGE_TOKEN,
     assert_password_strength,
@@ -42,7 +43,8 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: DbDep) -> User:
+async def register(body: RegisterRequest, db: DbDep, request: Request) -> User:
+    check_rate_limit(request, bucket="auth-register", limit=10, window_seconds=900)
     assert_password_strength(body.password)
     existing = await db.execute(select(User).where(User.email == body.email.lower()))
     if existing.scalar_one_or_none() is not None:
@@ -65,6 +67,7 @@ async def register(body: RegisterRequest, db: DbDep) -> User:
 
 @router.post("/login", response_model=TokenPair | MfaChallengeResponse)
 async def login(body: LoginRequest, db: DbDep, request: Request):
+    check_rate_limit(request, bucket="auth-login", limit=20, window_seconds=900)
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
@@ -76,6 +79,7 @@ async def login(body: LoginRequest, db: DbDep, request: Request):
 
 @router.post("/mfa/verify", response_model=TokenPair)
 async def mfa_verify(body: MfaVerifyRequest, db: DbDep, request: Request) -> TokenPair:
+    check_rate_limit(request, bucket="auth-mfa", limit=15, window_seconds=900)
     user_id = decode_token(body.challenge_token, MFA_CHALLENGE_TOKEN)
     if user_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
@@ -88,6 +92,7 @@ async def mfa_verify(body: MfaVerifyRequest, db: DbDep, request: Request) -> Tok
 
 @router.post("/refresh", response_model=TokenPair)
 async def refresh(body: RefreshRequest, db: DbDep, request: Request) -> TokenPair:
+    check_rate_limit(request, bucket="auth-refresh", limit=60, window_seconds=900)
     pair = await service.rotate_refresh_token(
         db, body.refresh_token, request.headers.get("user-agent")
     )
@@ -144,13 +149,17 @@ async def regenerate_recovery_codes(user: CurrentUser, db: DbDep) -> MfaRecovery
 async def password_reset_request(
     body: PasswordResetRequest, db: DbDep, request: Request
 ) -> PasswordResetRequestResponse:
+    check_rate_limit(request, bucket="auth-reset-request", limit=8, window_seconds=900)
     from app.auth.password_reset import request_password_reset
 
     return await request_password_reset(db, body.email, request)
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
-async def password_reset_confirm(body: PasswordResetConfirmRequest, db: DbDep) -> None:
+async def password_reset_confirm(
+    body: PasswordResetConfirmRequest, db: DbDep, request: Request
+) -> None:
+    check_rate_limit(request, bucket="auth-reset-confirm", limit=15, window_seconds=900)
     from app.auth.password_reset import confirm_password_reset
 
     await confirm_password_reset(db, body)
@@ -216,6 +225,7 @@ async def oauth_provider_callback(
     request: Request,
 ):
     """Exchange an authorization code for a Woney session (google | apple | microsoft)."""
+    check_rate_limit(request, bucket="auth-oauth", limit=30, window_seconds=900)
     from app.auth.oauth import exchange_apple_code, exchange_google_code, exchange_microsoft_code
     from app.core.config import get_settings
 

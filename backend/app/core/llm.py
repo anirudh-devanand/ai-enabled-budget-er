@@ -169,12 +169,17 @@ async def propose_merchant_category(
     """Ask the LLM to resolve a residual descriptor. Returns None if unavailable."""
     if isinstance(client, NullLlmClient):
         return None
+    # Same privacy scrub as assistant — bank descriptors may contain account-like digits.
+    from app.assistant.privacy import redact_user_text
+
+    safe_descriptor = redact_user_text(descriptor or "")
+    safe_amount = redact_user_text(str(amount or ""))
     prompt = (
         "Resolve this bank transaction descriptor into a human merchant name and "
         "one category slug from the allowed list. Reply with ONLY JSON: "
         '{"merchant_name":"...","category_slug":"...","confidence":0.0-1.0}. '
         "If you cannot tell, set confidence below 0.6.\n"
-        f"Descriptor: {descriptor}\nAmount: {amount}\n"
+        f"Descriptor: {safe_descriptor}\nAmount: {safe_amount}\n"
         f"Allowed categories: {', '.join(category_slugs)}"
     )
     try:

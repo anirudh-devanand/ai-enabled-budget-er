@@ -38,7 +38,8 @@ async def _send_resend(to_email: str, subject: str, text: str) -> bool:
                 json=payload,
             )
         if resp.status_code >= 400:
-            logger.warning("Resend email failed: %s %s", resp.status_code, resp.text)
+            # Do not log full provider body (may echo recipient / message content).
+            logger.warning("Resend email failed: status=%s", resp.status_code)
             return False
         return True
     except Exception:
