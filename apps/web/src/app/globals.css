@@ -1948,9 +1948,8 @@ textarea:-webkit-autofill:focus {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
   text-align: center;
 }
 
@@ -1960,14 +1959,6 @@ textarea:-webkit-autofill:focus {
   font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1;
-}
-
-.landing-hero-ring-caption {
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(243, 241, 234, 0.45);
 }
 
 .landing-hero-feed {

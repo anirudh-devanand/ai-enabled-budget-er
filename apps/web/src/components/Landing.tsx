@@ -39,7 +39,6 @@ function HeroScene() {
             </svg>
             <div className="landing-hero-ring-center">
               <span className="landing-hero-ring-pct">62%</span>
-              <span className="landing-hero-ring-caption">budget left</span>
             </div>
           </div>
         </div>
