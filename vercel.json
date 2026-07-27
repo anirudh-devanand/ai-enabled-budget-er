@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build --workspace apps/web",
+  "installCommand": "node -e \"const fs=require('fs'); for (const p of ['package.json','apps/web/package.json','packages/api-client/package.json','apps/mobile/package.json']) { if (!fs.existsSync(p)) { console.error('Incomplete deploy upload: missing '+p); process.exit(1);} } const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); if (!pkg.workspaces) { console.error('Incomplete deploy upload: root package.json has no workspaces'); process.exit(1);} \" && npm install",
+  "buildCommand": "npm run build:web",
   "outputDirectory": "apps/web/.next"
 }

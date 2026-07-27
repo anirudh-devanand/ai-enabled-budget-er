@@ -1,0 +1,8 @@
+# Keep monorepo workspace package.json files - omitting them breaks
+# `npm run build --workspace apps/web` ("No workspaces found").
+backend/**
+docs/**
+.github/**
+.pytest_cache/**
+**/*.md
+!README.md
