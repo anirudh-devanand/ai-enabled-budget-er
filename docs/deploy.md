@@ -40,13 +40,38 @@ fly secrets set WONEY_ENV=production \
 fly deploy
 ```
 
+## 1b. Plaid (Render API — not Vercel)
+
+Plaid Link tokens are created by the **API**. Secrets must live on the **Render** web
+service (`ledger-api-ayer` / `woney-api`), then **Manual Deploy** so the process picks them up.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `WONEY_PLAID_CLIENT_ID` | yes | Or legacy `LEDGER_PLAID_CLIENT_ID` (alias still works) |
+| `WONEY_PLAID_SECRET` | yes | Or legacy `LEDGER_PLAID_SECRET` |
+| `WONEY_PLAID_ENV` | recommended | `sandbox` \| `development` \| `production` |
+| `WONEY_PLAID_COUNTRY_CODES` | optional | default `CA` |
+
+You only need **one** prefix (`WONEY_*` preferred). If both are set, `WONEY_*` wins.
+Putting `LEDGER_PLAID_*` / `WONEY_PLAID_*` on **Vercel alone does nothing** for
+`plaid_configured` — Vercel only needs `NEXT_PUBLIC_API_URL`.
+
+Verify:
+
+```bash
+curl -s https://ledger-api-ayer.onrender.com/healthz
+# expect "plaid_configured": true
+```
+
 ## 2. Web (Vercel)
 
 1. Import the monorepo in Vercel; root directory = repo root (uses `vercel.json`).
 2. Environment variables:
-   - `NEXT_PUBLIC_API_URL` = `https://<your-api-host>` (no trailing slash)
-   - `NEXT_PUBLIC_FLINKS_IFRAME_URL` = your Flinks Connect iframe URL (sandbox or prod)
+   - `NEXT_PUBLIC_API_URL` = `https://<your-api-host>` (no trailing slash) — e.g. `https://ledger-api-ayer.onrender.com`
+   - Do **not** put Plaid client id/secret here; they belong on Render (section 1b)
 3. Deploy. Update API `WONEY_CORS_ORIGINS` to the Vercel production URL and redeploy API if needed.
+   CSP in `apps/web/next.config.ts` must allow `https://cdn.plaid.com` in `script-src`
+   (and frame/connect) or the connect page cannot load Plaid Link.
 
 ## 3. Cron (optional)
 

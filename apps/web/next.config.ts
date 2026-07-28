@@ -16,11 +16,13 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // cdn.plaid.com must be in script-src or Link fails to load (connect page
+      // otherwise shows a misleading "Check WONEY_PLAID_*" fallback).
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.onrender.com https://*.vercel.app https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com",
+      "connect-src 'self' https://*.onrender.com https://*.vercel.app https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com https://*.plaid.com",
       "frame-src 'self' https://cdn.plaid.com https://*.plaid.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",

@@ -28,7 +28,9 @@ function loadPlaidScript(): Promise<void> {
     const existing = document.querySelector('script[data-plaid="link"]');
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Plaid script failed")));
+      existing.addEventListener("error", () =>
+        reject(new Error("Plaid Link script failed to load (CSP or network)")),
+      );
       return;
     }
     const script = document.createElement("script");
@@ -36,9 +38,24 @@ function loadPlaidScript(): Promise<void> {
     script.async = true;
     script.dataset.plaid = "link";
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Plaid script failed to load"));
+    script.onerror = () =>
+      reject(new Error("Plaid Link script failed to load (CSP or network)"));
     document.body.appendChild(script);
   });
+}
+
+function formatPlaidStartError(err: unknown): string {
+  if (err instanceof ApiError) return err.detail;
+  if (err instanceof Error && /plaid link script/i.test(err.message)) {
+    return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return (
+    "Could not start Plaid Link. Confirm the Render API service has " +
+    "WONEY_PLAID_CLIENT_ID + WONEY_PLAID_SECRET (or legacy LEDGER_PLAID_*), " +
+    "redeployed, and GET /healthz shows plaid_configured: true. " +
+    "Plaid secrets on Vercel alone do not configure the API."
+  );
 }
 
 function ConnectInner() {
@@ -70,11 +87,7 @@ function ConnectInner() {
       } catch (err) {
         if (!cancelled) {
           setStatus("error");
-          setError(
-            err instanceof ApiError
-              ? err.detail
-              : "Could not start Plaid Link. Check WONEY_PLAID_* on the API.",
-          );
+          setError(formatPlaidStartError(err));
         }
       }
     })();

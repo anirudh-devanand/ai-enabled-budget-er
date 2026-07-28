@@ -67,7 +67,8 @@ class PlaidProvider:
         if not settings.plaid_configured:
             raise ProviderError(
                 "Plaid is not configured (set WONEY_PLAID_CLIENT_ID and WONEY_PLAID_SECRET "
-                "on the API host, then redeploy; GET /healthz reports plaid_configured)"
+                "— or legacy LEDGER_PLAID_* — on the Render API service, not only on Vercel; "
+                "redeploy, then GET /healthz should show plaid_configured: true)"
             )
         body = {
             "client_id": settings.plaid_client_id,
