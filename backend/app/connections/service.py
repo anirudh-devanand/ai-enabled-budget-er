@@ -11,6 +11,31 @@ from app.core.security import decrypt_secret, encrypt_secret
 from app.enrichment.service import enrich_transactions
 from app.households.models import HouseholdMember
 
+MAX_MASKED_DIGITS = 4
+
+
+def sanitize_masked_number(value: str | None) -> str | None:
+    """Store at most last-4 digits. Never persist full account numbers."""
+    if value is None:
+        return None
+    digits = "".join(c for c in str(value) if c.isdigit())
+    if not digits:
+        return None
+    if len(digits) > MAX_MASKED_DIGITS:
+        digits = digits[-MAX_MASKED_DIGITS:]
+    return digits
+
+
+def assert_masked_number_length(value: str | None) -> None:
+    """Reject values that would exceed last-4 after digit extraction (no auto-trunc)."""
+    if value is None:
+        return
+    digits = "".join(c for c in str(value) if c.isdigit())
+    if len(digits) > MAX_MASKED_DIGITS:
+        raise ValueError(
+            f"masked_number must be at most {MAX_MASKED_DIGITS} digits (got {len(digits)})"
+        )
+
 
 async def user_in_household(
     db: AsyncSession, user_id: uuid.UUID, household_id: uuid.UUID
@@ -83,7 +108,7 @@ async def _apply_snapshot(
                 type=provider_account.type,
                 currency=provider_account.currency,
                 balance=provider_account.balance,
-                masked_number=provider_account.masked_number,
+                masked_number=sanitize_masked_number(provider_account.masked_number),
             )
             db.add(account)
             await db.flush()

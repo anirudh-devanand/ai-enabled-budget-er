@@ -3,9 +3,10 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.security_events import record_security_event
 from app.connections import service
 from app.connections.csv_import import parse_bank_csv
 from app.connections.demo_seed import DemoSeedProvider
@@ -68,6 +69,17 @@ async def _require_membership(db: AsyncSession, user: User, household_id: uuid.U
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
 
 
+
+def _require_mfa_enabled(user: User) -> None:
+    """Live bank linking (Plaid / Flinks) requires MFA. CSV + demo stay open for Neo users."""
+    if not user.mfa_enabled:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Enable multi-factor authentication before linking a live bank. "
+            "Go to Account → Security, then try again. CSV import and demo data do not require MFA.",
+        )
+
+
 def _tx_responses(items, enrichments, merchants, categories) -> list[TransactionResponse]:
     responses: list[TransactionResponse] = []
     for t in items:
@@ -94,20 +106,34 @@ def _tx_responses(items, enrichments, merchants, categories) -> list[Transaction
 
 @router.post("/plaid/link-token", response_model=PlaidLinkTokenResponse)
 async def create_plaid_link_token(
-    body: PlaidLinkTokenRequest, user: CurrentUser, db: DbDep
+    body: PlaidLinkTokenRequest, user: CurrentUser, db: DbDep, request: Request
 ):
+    _require_mfa_enabled(user)
     await _require_membership(db, user, body.household_id)
     try:
         token = await PlaidProvider().create_link_token(client_user_id=str(user.id))
     except ProviderError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    await record_security_event(
+        db,
+        event_type="plaid_link_token",
+        user_id=user.id,
+        request=request,
+        meta={"household_id": str(body.household_id)},
+        commit=True,
+    )
     return PlaidLinkTokenResponse(link_token=token)
 
 
 @router.post("/plaid", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_plaid_connection(
-    body: PlaidExchangeRequest, user: CurrentUser, db: DbDep, provider: ProviderDep
+    body: PlaidExchangeRequest,
+    user: CurrentUser,
+    db: DbDep,
+    provider: ProviderDep,
+    request: Request,
 ):
+    _require_mfa_enabled(user)
     await _require_membership(db, user, body.household_id)
     plaid = PlaidProvider()
     try:
@@ -121,6 +147,14 @@ async def create_plaid_connection(
         connection = await service.sync_connection(db, connection, provider)
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
+    await record_security_event(
+        db,
+        event_type="plaid_connection_created",
+        user_id=user.id,
+        request=request,
+        meta={"connection_id": str(connection.id), "provider": "plaid"},
+        commit=True,
+    )
     return connection
 
 
@@ -175,10 +209,18 @@ async def import_csv_statement(
 
 @router.post("/", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection(
-    body: ConnectionCreateRequest, user: CurrentUser, db: DbDep, provider: ProviderDep
+    body: ConnectionCreateRequest,
+    user: CurrentUser,
+    db: DbDep,
+    provider: ProviderDep,
+    request: Request,
 ):
     await _require_membership(db, user, body.household_id)
-    provider_name = "demo" if body.login_id.startswith("demo-seed:") else "flinks"
+    is_demo = body.login_id.startswith("demo-seed:")
+    # Live Flinks requires MFA; CSV/demo stay open (Neo and QA paths).
+    if not is_demo:
+        _require_mfa_enabled(user)
+    provider_name = "demo" if is_demo else "flinks"
     connection = await service.create_connection(
         db, body.household_id, body.login_id, provider=provider_name
     )
@@ -186,13 +228,35 @@ async def create_connection(
         connection = await service.sync_connection(db, connection, provider)
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
+    if not is_demo:
+        await record_security_event(
+            db,
+            event_type="flinks_connection_created",
+            user_id=user.id,
+            request=request,
+            meta={"connection_id": str(connection.id), "provider": "flinks"},
+            commit=True,
+        )
     return connection
 
 
 @router.post("/sync-mine", response_model=SyncMineResponse)
-async def sync_mine(user: CurrentUser, db: DbDep, provider: ProviderDep):
+async def sync_mine(user: CurrentUser, db: DbDep, provider: ProviderDep, request: Request):
     """Sync all non-CSV bank connections for the current user's households."""
-    return await service.sync_user_connections(db, user.id, provider)
+    result = await service.sync_user_connections(db, user.id, provider)
+    await record_security_event(
+        db,
+        event_type="sync_mine",
+        user_id=user.id,
+        request=request,
+        meta={
+            "synced": result["synced"],
+            "failed": result["failed"],
+            "skipped": result["skipped"],
+        },
+        commit=True,
+    )
+    return result
 
 
 @router.post("/{connection_id}/sync", response_model=ConnectionResponse)

@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import service
+from app.auth.cookies import clear_refresh_cookie, read_refresh_token, set_refresh_cookie
 from app.auth.schemas import (
     LoginRequest,
     LogoutRequest,
@@ -21,6 +22,7 @@ from app.auth.schemas import (
     RegisterRequest,
     TokenPair,
 )
+from app.auth.security_events import record_security_event
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.rate_limit import check_rate_limit
@@ -40,6 +42,17 @@ router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def _issue_and_set_cookie(
+    db: AsyncSession,
+    response: Response,
+    request: Request,
+    user_id,
+) -> TokenPair:
+    pair = await service.issue_token_pair(db, user_id, request.headers.get("user-agent"))
+    set_refresh_cookie(response, pair.refresh_token, request)
+    return pair
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -66,50 +79,111 @@ async def register(body: RegisterRequest, db: DbDep, request: Request) -> User:
 
 
 @router.post("/login", response_model=TokenPair | MfaChallengeResponse)
-async def login(body: LoginRequest, db: DbDep, request: Request):
+async def login(body: LoginRequest, db: DbDep, request: Request, response: Response):
     check_rate_limit(request, bucket="auth-login", limit=20, window_seconds=900)
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
+        await record_security_event(
+            db,
+            event_type="login_failed",
+            user_id=user.id if user else None,
+            request=request,
+            meta={"email_domain": body.email.split("@")[-1].lower() if "@" in body.email else None},
+            commit=True,
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if user.mfa_enabled:
         return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
-    return await service.issue_token_pair(db, user.id, request.headers.get("user-agent"))
+    pair = await _issue_and_set_cookie(db, response, request, user.id)
+    await record_security_event(
+        db,
+        event_type="login_success",
+        user_id=user.id,
+        request=request,
+        meta={"method": "password"},
+        commit=True,
+    )
+    return pair
 
 
 @router.post("/mfa/verify", response_model=TokenPair)
-async def mfa_verify(body: MfaVerifyRequest, db: DbDep, request: Request) -> TokenPair:
+async def mfa_verify(
+    body: MfaVerifyRequest, db: DbDep, request: Request, response: Response
+) -> TokenPair:
     check_rate_limit(request, bucket="auth-mfa", limit=15, window_seconds=900)
     user_id = decode_token(body.challenge_token, MFA_CHALLENGE_TOKEN)
     if user_id is None:
+        await record_security_event(
+            db, event_type="mfa_verify_failed", request=request, meta={"reason": "bad_challenge"}, commit=True
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
     user = await db.get(User, user_id)
     if user is None or not service.verify_mfa_code(user, body.code):
+        await record_security_event(
+            db,
+            event_type="mfa_verify_failed",
+            user_id=user_id,
+            request=request,
+            meta={"reason": "bad_code"},
+            commit=True,
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code")
     await db.commit()
-    return await service.issue_token_pair(db, user.id, request.headers.get("user-agent"))
+    pair = await _issue_and_set_cookie(db, response, request, user.id)
+    await record_security_event(
+        db, event_type="mfa_verify_success", user_id=user.id, request=request, commit=True
+    )
+    return pair
 
 
 @router.post("/refresh", response_model=TokenPair)
-async def refresh(body: RefreshRequest, db: DbDep, request: Request) -> TokenPair:
+async def refresh(
+    request: Request,
+    response: Response,
+    db: DbDep,
+    body: RefreshRequest = RefreshRequest(),
+) -> TokenPair:
     check_rate_limit(request, bucket="auth-refresh", limit=60, window_seconds=900)
-    pair = await service.rotate_refresh_token(
-        db, body.refresh_token, request.headers.get("user-agent")
-    )
-    if pair is None:
+    token = read_refresh_token(request, body.refresh_token)
+    if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    pair = await service.rotate_refresh_token(db, token, request.headers.get("user-agent"))
+    if pair is None:
+        clear_refresh_cookie(response, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    set_refresh_cookie(response, pair.refresh_token, request)
     return pair
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(body: LogoutRequest, db: DbDep) -> None:
-    if not await service.revoke_session(db, body.refresh_token):
+async def logout(
+    request: Request,
+    response: Response,
+    db: DbDep,
+    body: LogoutRequest = LogoutRequest(),
+) -> None:
+    token = read_refresh_token(request, body.refresh_token)
+    if not token:
+        clear_refresh_cookie(response, request)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    user_id = await service.active_session_user_id(db, token)
+    if not await service.revoke_session(db, token):
+        clear_refresh_cookie(response, request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
+    clear_refresh_cookie(response, request)
+    await record_security_event(
+        db, event_type="logout", user_id=user_id, request=request, commit=True
+    )
 
 
 @router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
-async def logout_all(user: CurrentUser, db: DbDep) -> None:
+async def logout_all(user: CurrentUser, db: DbDep, request: Request, response: Response) -> None:
     await service.revoke_all_sessions(db, user.id)
+    clear_refresh_cookie(response, request)
+    await record_security_event(
+        db, event_type="logout_all", user_id=user.id, request=request, commit=True
+    )
 
 
 @router.post("/mfa/enroll", response_model=MfaEnrollResponse)
@@ -189,6 +263,7 @@ async def _oauth_upsert_and_issue(
     *,
     db: AsyncSession,
     request: Request,
+    response: Response,
     provider: str,
     email: str,
     subject: str,
@@ -214,7 +289,16 @@ async def _oauth_upsert_and_issue(
     await db.refresh(user)
     if user.mfa_enabled:
         return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
-    return await service.issue_token_pair(db, user.id, request.headers.get("user-agent"))
+    pair = await _issue_and_set_cookie(db, response, request, user.id)
+    await record_security_event(
+        db,
+        event_type="oauth_login",
+        user_id=user.id,
+        request=request,
+        meta={"provider": provider},
+        commit=True,
+    )
+    return pair
 
 
 @router.post("/oauth/{provider}/callback", response_model=TokenPair | MfaChallengeResponse)
@@ -223,6 +307,7 @@ async def oauth_provider_callback(
     body: dict,
     db: DbDep,
     request: Request,
+    response: Response,
 ):
     """Exchange an authorization code for a Woney session (google | apple | microsoft)."""
     check_rate_limit(request, bucket="auth-oauth", limit=30, window_seconds=900)
@@ -262,9 +347,9 @@ async def oauth_provider_callback(
     return await _oauth_upsert_and_issue(
         db=db,
         request=request,
+        response=response,
         provider=provider,
         email=email,
         subject=str(subject),
         display_name=profile.get("name") or email.split("@")[0],
     )
-

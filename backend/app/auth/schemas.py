@@ -33,11 +33,12 @@ class MfaVerifyRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Optional: mobile sends body; web may rely on HttpOnly cookie alone.
+    refresh_token: str | None = None
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class MfaEnrollResponse(BaseModel):

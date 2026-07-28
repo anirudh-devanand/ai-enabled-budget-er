@@ -123,6 +123,7 @@ export class WoneyClient {
     const resp = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers,
+      credentials: "include",
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (resp.status === 401 && opts.auth && !opts.retried) {
@@ -145,11 +146,13 @@ export class WoneyClient {
 
   private async tryRefresh(): Promise<boolean> {
     const refreshToken = this.storage.getRefreshToken();
-    if (!refreshToken) return false;
     try {
-      const pair = await this.request<TokenPair>("POST", "/v1/auth/refresh", {
-        refresh_token: refreshToken,
-      });
+      // Mobile: send body refresh. Web: empty body + HttpOnly cookie (credentials include).
+      const pair = await this.request<TokenPair>(
+        "POST",
+        "/v1/auth/refresh",
+        refreshToken ? { refresh_token: refreshToken } : {},
+      );
       this.storage.setTokens(pair);
       return true;
     } catch {
@@ -188,11 +191,11 @@ export class WoneyClient {
 
   async logout(): Promise<void> {
     const refreshToken = this.storage.getRefreshToken();
-    if (refreshToken) {
-      await this.request<void>("POST", "/v1/auth/logout", { refresh_token: refreshToken }).catch(
-        () => undefined,
-      );
-    }
+    await this.request<void>(
+      "POST",
+      "/v1/auth/logout",
+      refreshToken ? { refresh_token: refreshToken } : {},
+    ).catch(() => undefined);
     this.storage.clear();
   }
 
@@ -353,6 +356,7 @@ export class WoneyClient {
     const resp = await fetch(`${this.baseUrl}/v1/connections/import`, {
       method: "POST",
       headers,
+      credentials: "include",
       body: form,
     });
     if (resp.status === 401) {

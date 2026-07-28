@@ -9,7 +9,7 @@ from app.connections.provider import (
 )
 from app.connections.router import get_provider
 from app.main import app
-from tests.conftest import register_and_login
+from tests.conftest import enable_mfa, register_and_login
 
 
 class FakeProvider:
@@ -78,8 +78,10 @@ def _snapshot(extra_txn: bool = False) -> ProviderSnapshot:
     )
 
 
-async def _setup(client, payload) -> tuple[dict, str]:
+async def _setup(client, payload, *, with_mfa: bool = True) -> tuple[dict, str]:
     tokens = await register_and_login(client, payload)
+    if with_mfa:
+        await enable_mfa(client, tokens)
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     resp = await client.get("/v1/households/", headers=headers)
     return headers, resp.json()[0]["id"]
@@ -217,3 +219,31 @@ async def test_connections_scoped_to_household_membership(client, register_paylo
     ):
         resp = await client.get(path, headers=headers_b)
         assert resp.status_code == 404
+
+
+async def test_live_bank_link_requires_mfa(client, register_payload):
+    headers, household_id = await _setup(client, register_payload, with_mfa=False)
+    _use_provider(FakeProvider(_snapshot()))
+
+    resp = await client.post(
+        "/v1/connections/plaid/link-token",
+        json={"household_id": household_id},
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert "multi-factor" in resp.json()["detail"].lower()
+
+    resp = await client.post(
+        "/v1/connections/",
+        json={"household_id": household_id, "login_id": "flinks-login-abc123"},
+        headers=headers,
+    )
+    assert resp.status_code == 403
+
+    # Demo seed remains available without MFA.
+    resp = await client.post(
+        "/v1/connections/",
+        json={"household_id": household_id, "login_id": "demo-seed:scotia:30"},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text

@@ -66,6 +66,13 @@ async def rotate_refresh_token(
     return await issue_token_pair(db, session.user_id, user_agent)
 
 
+async def active_session_user_id(
+    db: AsyncSession, refresh_token: str
+) -> uuid.UUID | None:
+    session = await _find_active_session(db, refresh_token)
+    return session.user_id if session else None
+
+
 async def revoke_session(db: AsyncSession, refresh_token: str) -> bool:
     session = await _find_active_session(db, refresh_token)
     if session is None:

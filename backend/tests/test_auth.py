@@ -152,3 +152,48 @@ async def test_mfa_enroll_activate_and_login_flow(client, register_payload):
         json={"challenge_token": challenge, "code": recovery[0]},
     )
     assert resp.status_code == 401
+
+
+async def test_refresh_and_logout_via_httponly_cookie(client, register_payload):
+    await register_and_login(client, register_payload)
+    login_resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    assert login_resp.status_code == 200
+    assert "woney_refresh" in login_resp.cookies
+    cookie_val = login_resp.cookies["woney_refresh"]
+    set_cookie = login_resp.headers.get("set-cookie", "")
+    assert "woney_refresh=" in set_cookie
+    assert "HttpOnly" in set_cookie or "httponly" in set_cookie.lower()
+
+    client.cookies.set("woney_refresh", cookie_val)
+    resp = await client.post("/v1/auth/refresh", json={})
+    assert resp.status_code == 200, resp.text
+    new_tokens = resp.json()
+    assert new_tokens["refresh_token"] != cookie_val
+    assert "woney_refresh" in resp.cookies
+
+    # Body path still works (mobile SecureStore).
+    resp = await client.post(
+        "/v1/auth/refresh", json={"refresh_token": new_tokens["refresh_token"]}
+    )
+    assert resp.status_code == 200
+    latest = resp.cookies.get("woney_refresh") or resp.json()["refresh_token"]
+    client.cookies.set("woney_refresh", latest)
+
+    resp = await client.post("/v1/auth/logout", json={})
+    assert resp.status_code == 204
+
+    resp = await client.post("/v1/auth/refresh", json={})
+    assert resp.status_code == 401
+
+
+async def test_refresh_accepts_body_without_cookie(client, register_payload):
+    tokens = await register_and_login(client, register_payload)
+    client.cookies.clear()
+    resp = await client.post(
+        "/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()

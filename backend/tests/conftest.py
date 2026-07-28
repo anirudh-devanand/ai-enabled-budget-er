@@ -5,6 +5,7 @@ os.environ["WONEY_DATABASE_URL"] = "sqlite+aiosqlite://"
 os.environ["WONEY_JWT_SECRET"] = "test-secret"
 os.environ["WONEY_OPS_TOKEN"] = "test-ops-token"
 
+import pyotp
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -63,3 +64,15 @@ async def register_and_login(client, payload) -> dict:
     )
     assert resp.status_code == 200, resp.text
     return resp.json()
+
+
+async def enable_mfa(client, tokens: dict) -> str:
+    """Enroll + activate TOTP MFA; returns the TOTP secret."""
+    auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+    resp = await client.post("/v1/auth/mfa/enroll", headers=auth)
+    assert resp.status_code == 200, resp.text
+    secret = resp.json()["secret"]
+    code = pyotp.TOTP(secret).now()
+    resp = await client.post("/v1/auth/mfa/activate", json={"code": code}, headers=auth)
+    assert resp.status_code == 200, resp.text
+    return secret

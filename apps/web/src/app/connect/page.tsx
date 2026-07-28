@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@woney/api-client";
@@ -66,6 +67,7 @@ function ConnectInner() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const submitted = useRef(false);
 
   const [accountName, setAccountName] = useState("Neo Everyday");
@@ -78,6 +80,14 @@ function ConnectInner() {
     let cancelled = false;
     (async () => {
       try {
+        const me = await api.me();
+        if (cancelled) return;
+        setMfaEnabled(me.mfa_enabled);
+        if (!me.mfa_enabled) {
+          setStatus("idle");
+          setError(null);
+          return;
+        }
         await loadPlaidScript();
         const { link_token } = await api.createPlaidLinkToken(householdId);
         if (!cancelled) {
@@ -217,14 +227,25 @@ function ConnectInner() {
               Works with major Canadian banks via Plaid. Woney never sees your bank password.
               Neo is usually not on Plaid — use CSV import for that.
             </p>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!linkToken || status === "syncing"}
-              onClick={openPlaid}
-            >
-              {linkToken ? "Open Plaid Link" : "Preparing Link…"}
-            </button>
+            {mfaEnabled === false ? (
+              <div>
+                <p className="error" style={{ marginTop: 0 }}>
+                  Enable multi-factor authentication before linking a live bank.
+                </p>
+                <Link href="/account#security" className="btn btn-primary">
+                  Open Account security
+                </Link>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!linkToken || status === "syncing"}
+                onClick={openPlaid}
+              >
+                {linkToken ? "Open Plaid Link" : "Preparing Link…"}
+              </button>
+            )}
           </section>
         )}
 
@@ -233,7 +254,7 @@ function ConnectInner() {
             <h2>Import a statement</h2>
             <p className="sub">
               Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are detected
-              automatically from common Canadian export formats.
+              automatically from common Canadian export formats. MFA is not required for CSV import.
             </p>
             <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
               <label>

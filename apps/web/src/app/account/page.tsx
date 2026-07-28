@@ -55,6 +55,13 @@ export default function AccountPage() {
   const [deleteCode, setDeleteCode] = useState("");
   const [deletePhrase, setDeletePhrase] = useState("");
 
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaUri, setMfaUri] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
   const load = useCallback(async () => {
     const [me, households] = await Promise.all([api.me(), api.listHouseholds()]);
     setUser(me);
@@ -196,6 +203,60 @@ export default function AccountPage() {
     }
   }
 
+  async function startMfaEnroll() {
+    setMfaBusy(true);
+    setMfaError(null);
+    setRecoveryCodes(null);
+    try {
+      const enrolled = await api.enrollMfa();
+      setMfaSecret(enrolled.secret);
+      setMfaUri(enrolled.otpauth_uri);
+      setMfaCode("");
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setMfaError(getApiDetail(err, "Could not start MFA enrollment"));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function activateMfa() {
+    setMfaBusy(true);
+    setMfaError(null);
+    try {
+      const result = await api.activateMfa(mfaCode.trim());
+      setRecoveryCodes(result.recovery_codes);
+      setMfaSecret(null);
+      setMfaUri(null);
+      setMfaCode("");
+      const me = await api.me();
+      setUser(me);
+      setToast("MFA enabled");
+      setTimeout(() => setToast(null), 2500);
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setMfaError(getApiDetail(err, "Invalid authenticator code"));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function regenRecoveryCodes() {
+    setMfaBusy(true);
+    setMfaError(null);
+    try {
+      const result = await api.regenerateRecoveryCodes();
+      setRecoveryCodes(result.recovery_codes);
+      setToast("New recovery codes generated");
+      setTimeout(() => setToast(null), 2500);
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setMfaError(getApiDetail(err, "Could not regenerate codes"));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
   if (!user) {
     return (
       <div className="app-main">
@@ -263,6 +324,88 @@ export default function AccountPage() {
           <button type="button" className="btn btn-primary" onClick={saveProfile} disabled={busy}>
             Save profile
           </button>
+        </section>
+
+        <section className="account-panel" id="security">
+          <h3>Security</h3>
+          <p className="panel-lede">
+            Multi-factor authentication is required before linking a live bank with Plaid.
+            CSV import and demo data do not require MFA.
+          </p>
+          {user.mfa_enabled ? (
+            <>
+              <p className="muted" style={{ marginTop: 0 }}>
+                MFA is <strong>enabled</strong> on this account.
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={regenRecoveryCodes}
+                disabled={mfaBusy}
+              >
+                {mfaBusy ? "Working…" : "Regenerate recovery codes"}
+              </button>
+            </>
+          ) : mfaSecret ? (
+            <div className="stack" style={{ gap: 12 }}>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Add this secret to your authenticator app, then enter a 6-digit code.
+              </p>
+              <div className="field">
+                <label htmlFor="mfa-secret">Secret</label>
+                <input id="mfa-secret" value={mfaSecret} readOnly className="mono" />
+              </div>
+              {mfaUri && (
+                <p className="muted" style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>
+                  {mfaUri}
+                </p>
+              )}
+              <div className="field">
+                <label htmlFor="mfa-code">Authenticator code</label>
+                <input
+                  id="mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  placeholder="6-digit code"
+                />
+              </div>
+              {mfaError && <div className="error">{mfaError}</div>}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={activateMfa}
+                disabled={mfaBusy || mfaCode.trim().length < 6}
+              >
+                {mfaBusy ? "Activating…" : "Activate MFA"}
+              </button>
+            </div>
+          ) : (
+            <>
+              {mfaError && <div className="error">{mfaError}</div>}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={startMfaEnroll}
+                disabled={mfaBusy}
+              >
+                {mfaBusy ? "Starting…" : "Enable MFA"}
+              </button>
+            </>
+          )}
+          {recoveryCodes && recoveryCodes.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Save these recovery codes somewhere safe — each works once.
+              </p>
+              <ul className="mono" style={{ fontSize: "0.85rem", paddingLeft: 18 }}>
+                {recoveryCodes.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       </div>
 
