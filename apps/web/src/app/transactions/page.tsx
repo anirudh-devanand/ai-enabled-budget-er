@@ -136,8 +136,12 @@ export default function TransactionsPage() {
 
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
 
+  const reload = useCallback(async () => {
+    if (householdId) await load(householdId);
+  }, [householdId, load]);
+
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={reload}>
       <div className="page-header">
         <div>
           <h1>Activity</h1>

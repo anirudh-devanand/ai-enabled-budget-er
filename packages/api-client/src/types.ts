@@ -73,6 +73,12 @@ export interface ConnectionResponse {
   created_at: string;
 }
 
+export interface SyncMineResponse {
+  synced: number;
+  failed: number;
+  skipped: number;
+}
+
 export interface AccountResponse {
   id: string;
   connection_id: string;

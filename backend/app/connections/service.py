@@ -156,6 +156,40 @@ async def list_connections(db: AsyncSession, household_id: uuid.UUID) -> list[Ba
     return list(result.scalars().all())
 
 
+async def list_connections_for_user(
+    db: AsyncSession, user_id: uuid.UUID
+) -> list[BankConnection]:
+    """All bank connections across households the user belongs to."""
+    result = await db.execute(
+        select(BankConnection)
+        .join(
+            HouseholdMember,
+            HouseholdMember.household_id == BankConnection.household_id,
+        )
+        .where(HouseholdMember.user_id == user_id)
+        .order_by(BankConnection.created_at)
+    )
+    return list(result.scalars().unique().all())
+
+
+async def sync_user_connections(
+    db: AsyncSession, user_id: uuid.UUID, provider: BankProvider
+) -> dict[str, int]:
+    """Pull-sync every non-CSV connection for the user's households."""
+    connections = await list_connections_for_user(db, user_id)
+    ok = fail = skipped = 0
+    for connection in connections:
+        if connection.provider == "csv":
+            skipped += 1
+            continue
+        try:
+            await sync_connection(db, connection, provider)
+            ok += 1
+        except Exception:
+            fail += 1
+    return {"synced": ok, "failed": fail, "skipped": skipped}
+
+
 async def list_accounts(db: AsyncSession, household_id: uuid.UUID) -> list[Account]:
     result = await db.execute(
         select(Account)

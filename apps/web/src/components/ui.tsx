@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryChip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
+import { getBankSyncState, subscribeBankSync, syncMyBanks } from "@/lib/bankSync";
 import { passwordScore } from "@/lib/ui";
 
 export { CategoryIcon };
@@ -21,17 +23,53 @@ const LINKS = [
 
 export function AppShell({
   children,
-  householdId,
+  householdId: _householdId,
+  onRefresh,
 }: {
   children: React.ReactNode;
   householdId?: string | null;
+  /** Re-fetch page data after a bank sync completes. */
+  onRefresh?: () => void | Promise<void>;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [syncing, setSyncing] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Preserve in-flight login sync so we refresh when it finishes.
+    let wasSyncing = getBankSyncState().syncing;
+    setSyncing(wasSyncing);
+    return subscribeBankSync((state) => {
+      setSyncing(state.syncing);
+      if (wasSyncing && !state.syncing && onRefresh) {
+        void Promise.resolve(onRefresh()).catch(() => undefined);
+      }
+      wasSyncing = state.syncing;
+    });
+  }, [onRefresh]);
 
   async function logout() {
     await api.logout();
     router.replace("/login");
+  }
+
+  async function handleRefresh() {
+    setToast(null);
+    try {
+      const result = await syncMyBanks({ force: true });
+      if (result.failed > 0) {
+        setToast(`Synced ${result.synced}, ${result.failed} failed`);
+      } else if (result.synced === 0 && result.skipped === 0) {
+        setToast("No banks to sync");
+      } else if (!result.deduped) {
+        setToast("Accounts refreshed");
+      }
+    } catch {
+      setToast("Could not sync banks");
+    } finally {
+      setTimeout(() => setToast(null), 2800);
+    }
   }
 
   return (
@@ -58,8 +96,43 @@ export function AppShell({
           </button>
         </div>
       </aside>
-      <div className="app-main">{children}</div>
+      <div className="app-main">
+        <div className="app-chrome-bar">
+          <button
+            type="button"
+            className={`btn btn-ghost btn-icon${syncing ? " is-spinning" : ""}`}
+            onClick={handleRefresh}
+            disabled={syncing}
+            aria-label={syncing ? "Syncing banks" : "Refresh bank data"}
+            title={syncing ? "Syncing…" : "Refresh banks"}
+          >
+            <RefreshIcon />
+          </button>
+        </div>
+        {toast && <div className="toast app-chrome-toast">{toast}</div>}
+        {children}
+      </div>
     </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M21 12a9 9 0 1 1-2.64-6.36"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M21 3v6h-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

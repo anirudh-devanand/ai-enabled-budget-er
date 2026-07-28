@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { BudgetDetailResponse, CategoryResponse } from "@woney/api-client";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -15,24 +15,28 @@ export default function BudgetsPage() {
   const [catNames, setCatNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
+  const load = useCallback(async () => {
+    const [households, cats] = await Promise.all([
+      api.listHouseholds(),
+      api.listCategories(),
+    ]);
+    const hid = households[0]?.id ?? null;
+    setHouseholdId(hid);
+    setCatNames(Object.fromEntries(cats.map((c: CategoryResponse) => [c.id, c.name])));
+    if (!hid) {
+      setBudget(null);
+      return;
+    }
+    const list = await api.listBudgets(hid);
+    if (list[0]) setBudget(await api.getBudget(list[0].id));
+    else setBudget(null);
+  }, []);
+
   useEffect(() => {
-    (async () => {
-      try {
-        const [households, cats] = await Promise.all([
-          api.listHouseholds(),
-          api.listCategories(),
-        ]);
-        const hid = households[0]?.id ?? null;
-        setHouseholdId(hid);
-        setCatNames(Object.fromEntries(cats.map((c: CategoryResponse) => [c.id, c.name])));
-        if (!hid) return;
-        const list = await api.listBudgets(hid);
-        if (list[0]) setBudget(await api.getBudget(list[0].id));
-      } catch (err) {
-        if (isUnauthorized(err)) router.replace("/login");
-      }
-    })();
-  }, [router]);
+    load().catch((err) => {
+      if (isUnauthorized(err)) router.replace("/login");
+    });
+  }, [load, router]);
 
   async function propose() {
     if (!householdId) return;
@@ -49,7 +53,7 @@ export default function BudgetsPage() {
   }
 
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={load}>
       <div className="page-header">
         <div>
           <h1>Budgets</h1>

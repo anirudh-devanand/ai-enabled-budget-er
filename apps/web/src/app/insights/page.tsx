@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   CashFlowPoint,
   NamedAmount,
@@ -30,39 +30,41 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(true);
   const colors = chartColors();
 
+  const load = useCallback(async () => {
+    const households = await api.listHouseholds();
+    const hid = households[0]?.id ?? null;
+    setHouseholdId(hid);
+    if (!hid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const [nw, sum, flow, spend, inc] = await Promise.all([
+        api.getNetWorth(hid),
+        api.getPeriodSummary(hid, days),
+        api.getCashFlow(hid, days),
+        api.getSpendingByCategory(hid, days),
+        api.getIncomeByCategory(hid, days),
+      ]);
+      setNetWorth(nw);
+      setSummary(sum);
+      setCashFlow(flow);
+      setSpending(spend);
+      setIncome(inc);
+    } finally {
+      setLoading(false);
+    }
+  }, [days]);
+
   useEffect(() => {
-    (async () => {
-      try {
-        const households = await api.listHouseholds();
-        const hid = households[0]?.id ?? null;
-        setHouseholdId(hid);
-        if (!hid) {
-          setLoading(false);
-          return;
-        }
-        setLoading(true);
-        const [nw, sum, flow, spend, inc] = await Promise.all([
-          api.getNetWorth(hid),
-          api.getPeriodSummary(hid, days),
-          api.getCashFlow(hid, days),
-          api.getSpendingByCategory(hid, days),
-          api.getIncomeByCategory(hid, days),
-        ]);
-        setNetWorth(nw);
-        setSummary(sum);
-        setCashFlow(flow);
-        setSpending(spend);
-        setIncome(inc);
-      } catch (err) {
-        if (isUnauthorized(err)) router.replace("/login");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [router, days]);
+    load().catch((err) => {
+      if (isUnauthorized(err)) router.replace("/login");
+    });
+  }, [load, router]);
 
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={load}>
       <div className="page-header">
         <div>
           <h1>Insights</h1>

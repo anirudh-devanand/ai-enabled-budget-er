@@ -8,6 +8,7 @@ import { AuthBrand } from "@/components/AuthBrand";
 import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
+import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 import { passwordScore } from "@/lib/ui";
 
@@ -46,6 +47,7 @@ export default function RegisterPage() {
     try {
       await api.register(email, password, displayName);
       await api.login(email, password);
+      kickoffBankSync();
       router.replace("/dashboard");
     } catch (err) {
       setError(authErrorMessage(err));

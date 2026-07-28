@@ -23,6 +23,7 @@ from app.connections.schemas import (
     PlaidExchangeRequest,
     PlaidLinkTokenRequest,
     PlaidLinkTokenResponse,
+    SyncMineResponse,
     TransactionListResponse,
     TransactionResponse,
 )
@@ -186,6 +187,12 @@ async def create_connection(
     except ProviderError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
     return connection
+
+
+@router.post("/sync-mine", response_model=SyncMineResponse)
+async def sync_mine(user: CurrentUser, db: DbDep, provider: ProviderDep):
+    """Sync all non-CSV bank connections for the current user's households."""
+    return await service.sync_user_connections(db, user.id, provider)
 
 
 @router.post("/{connection_id}/sync", response_model=ConnectionResponse)

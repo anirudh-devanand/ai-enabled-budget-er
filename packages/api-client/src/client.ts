@@ -6,6 +6,7 @@ import type {
   CategoryResponse,
   ConnectionResponse,
   ConversationResponse,
+  SyncMineResponse,
   DeleteConfirmRequest,
   DeleteRequestResponse,
   CashFlowPoint,
@@ -381,6 +382,13 @@ export class WoneyClient {
       undefined,
       { auth: true },
     );
+  }
+
+  /** Sync all non-CSV bank connections across the user's households. */
+  syncMineBanks() {
+    return this.request<SyncMineResponse>("POST", "/v1/connections/sync-mine", undefined, {
+      auth: true,
+    });
   }
 
   listConnections(householdId: string) {

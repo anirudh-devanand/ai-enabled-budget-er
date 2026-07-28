@@ -154,6 +154,32 @@ async def test_resync_is_idempotent_and_picks_up_new_transactions(client, regist
     assert data["items"][0]["raw_description"] == "SQ *JOES COFFEE TORONTO"
 
 
+async def test_sync_mine_syncs_user_connections(client, register_payload):
+    headers, household_id = await _setup(client, register_payload)
+    provider = FakeProvider(_snapshot())
+    _use_provider(provider)
+
+    resp = await client.post(
+        "/v1/connections/",
+        json={"household_id": household_id, "login_id": "flinks-login-abc123"},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+
+    provider.snapshot = _snapshot(extra_txn=True)
+    resp = await client.post("/v1/connections/sync-mine", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["synced"] == 1
+    assert body["failed"] == 0
+    assert body["skipped"] == 0
+
+    resp = await client.get(
+        f"/v1/connections/transactions?household_id={household_id}", headers=headers
+    )
+    assert resp.json()["total"] == 3
+
+
 async def test_provider_failure_marks_connection_error(client, register_payload):
     headers, household_id = await _setup(client, register_payload)
     _use_provider(FakeProvider(fail=True))

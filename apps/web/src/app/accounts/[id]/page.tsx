@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AccountDetailResponse, AccountResponse, TransactionResponse } from "@woney/api-client";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
@@ -22,49 +22,51 @@ export default function AccountDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const households = await api.listHouseholds();
-        const hid = households[0]?.id ?? null;
-        setHouseholdId(hid);
-        if (!hid) return;
+  const load = useCallback(async () => {
+    const households = await api.listHouseholds();
+    const hid = households[0]?.id ?? null;
+    setHouseholdId(hid);
+    if (!hid) return;
 
-        try {
-          const detail = await api.getAccount(accountId);
-          setAccount(detail);
-          setNickname(detail.nickname || "");
-          setNotes(detail.notes || "");
-          setCanEdit(true);
-        } catch {
-          // Fallback when detail endpoint isn't deployed yet.
-          const [accs, txns] = await Promise.all([
-            api.listAccounts(hid),
-            api.listTransactions(hid, 80).catch(() => ({ items: [], total: 0 })),
-          ]);
-          const match = accs.find((a: AccountResponse) => a.id === accountId);
-          if (!match) {
-            setError("Account not found");
-            return;
-          }
-          const recent: TransactionResponse[] = txns.items.filter(
-            (t) => t.account_id === accountId,
-          );
-          setAccount({
-            ...match,
-            display_name: match.display_name || match.name,
-            recent_transactions: recent,
-          });
-          setNickname(match.nickname || "");
-          setNotes(match.notes || "");
-          setCanEdit(false);
-        }
-      } catch (err) {
-        if (isUnauthorized(err)) router.replace("/login");
-        else setError("Could not load account");
+    try {
+      const detail = await api.getAccount(accountId);
+      setAccount(detail);
+      setNickname(detail.nickname || "");
+      setNotes(detail.notes || "");
+      setCanEdit(true);
+      setError(null);
+    } catch {
+      // Fallback when detail endpoint isn't deployed yet.
+      const [accs, txns] = await Promise.all([
+        api.listAccounts(hid),
+        api.listTransactions(hid, 80).catch(() => ({ items: [], total: 0 })),
+      ]);
+      const match = accs.find((a: AccountResponse) => a.id === accountId);
+      if (!match) {
+        setError("Account not found");
+        return;
       }
-    })();
-  }, [accountId, router]);
+      const recent: TransactionResponse[] = txns.items.filter(
+        (t) => t.account_id === accountId,
+      );
+      setAccount({
+        ...match,
+        display_name: match.display_name || match.name,
+        recent_transactions: recent,
+      });
+      setNickname(match.nickname || "");
+      setNotes(match.notes || "");
+      setCanEdit(false);
+      setError(null);
+    }
+  }, [accountId]);
+
+  useEffect(() => {
+    load().catch((err) => {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setError("Could not load account");
+    });
+  }, [load, router]);
 
   async function save() {
     if (!canEdit) {
@@ -87,7 +89,7 @@ export default function AccountDetailPage() {
 
   if (error) {
     return (
-      <AppShell householdId={householdId}>
+      <AppShell householdId={householdId} onRefresh={load}>
         <p className="error">{error}</p>
         <Link href="/dashboard" className="btn btn-ghost" style={{ textDecoration: "none" }}>
           Back to home
@@ -105,7 +107,7 @@ export default function AccountDetailPage() {
   }
 
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={load}>
       <div className="page-header">
         <div>
           <h1>{account.display_name || account.name}</h1>

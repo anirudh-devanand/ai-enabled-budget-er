@@ -44,7 +44,32 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
+  const [dataEpoch, setDataEpoch] = useState(0);
   const strength = useMemo(() => passwordScore(password), [password]);
+
+  function kickoffSync() {
+    void api.syncMineBanks().catch(() => undefined);
+  }
+
+  async function refreshBanks() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncNote(null);
+    try {
+      const result = await api.syncMineBanks();
+      setDataEpoch((n) => n + 1);
+      if (result.failed > 0) {
+        setSyncNote(`Synced ${result.synced}, ${result.failed} failed`);
+      }
+    } catch (err) {
+      setSyncNote(err instanceof ApiError ? err.detail : "Could not sync banks");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncNote(null), 2800);
+    }
+  }
 
   async function login() {
     setError(null);
@@ -54,6 +79,7 @@ export default function App() {
       if (isMfaChallenge(result)) {
         setChallengeToken(result.challenge_token);
       } else {
+        kickoffSync();
         setUser(await api.me());
       }
     } catch (err) {
@@ -86,6 +112,7 @@ export default function App() {
     try {
       await api.verifyMfa(challengeToken, code);
       setChallengeToken(null);
+      kickoffSync();
       setUser(await api.me());
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Something went wrong");
@@ -98,6 +125,7 @@ export default function App() {
     await api.logout();
     setUser(null);
     setTab("home");
+    setDataEpoch(0);
   }
 
   if (!user) {
@@ -228,22 +256,37 @@ export default function App() {
       <StatusBar style="dark" />
       <View style={styles.topBar}>
         <Text style={styles.topBrand}>Woney</Text>
-        <Pressable onPress={logout} hitSlop={8}>
-          <Text style={styles.link}>Sign out</Text>
-        </Pressable>
+        <View style={styles.topActions}>
+          <Pressable onPress={refreshBanks} hitSlop={8} disabled={syncing} style={{ marginRight: 16 }}>
+            {syncing ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Text style={styles.link}>Refresh</Text>
+            )}
+          </Pressable>
+          <Pressable onPress={logout} hitSlop={8}>
+            <Text style={styles.link}>Sign out</Text>
+          </Pressable>
+        </View>
       </View>
+      {syncNote ? (
+        <View style={styles.syncBanner}>
+          <Text style={styles.syncBannerText}>{syncNote}</Text>
+        </View>
+      ) : null}
       <View style={styles.body}>
         {tab === "home" && (
           <HomeScreen
+            key={`home-${dataEpoch}`}
             onOpenConnect={() => setTab("connect")}
             onOpenGoals={() => setTab("goals")}
           />
         )}
-        {tab === "txns" && <TransactionsScreen />}
-        {tab === "budgets" && <BudgetsScreen />}
-        {tab === "goals" && <GoalsScreen />}
-        {tab === "assistant" && <AssistantScreen />}
-        {tab === "connect" && <ConnectScreen />}
+        {tab === "txns" && <TransactionsScreen key={`txns-${dataEpoch}`} />}
+        {tab === "budgets" && <BudgetsScreen key={`budgets-${dataEpoch}`} />}
+        {tab === "goals" && <GoalsScreen key={`goals-${dataEpoch}`} />}
+        {tab === "assistant" && <AssistantScreen key={`assistant-${dataEpoch}`} />}
+        {tab === "connect" && <ConnectScreen key={`connect-${dataEpoch}`} />}
       </View>
       <View style={styles.tabs}>
         {TABS.map((t) => (
@@ -368,6 +411,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.92)",
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  topActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  syncBanner: {
+    backgroundColor: colors.accentSoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  syncBannerText: {
+    color: colors.text,
+    fontSize: 13,
   },
   topBrand: {
     color: colors.text,

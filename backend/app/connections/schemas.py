@@ -36,6 +36,12 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
 
 
+class SyncMineResponse(BaseModel):
+    synced: int
+    failed: int
+    skipped: int = 0
+
+
 class CsvImportResponse(BaseModel):
     connection: ConnectionResponse
     imported_transactions: int

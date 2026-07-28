@@ -213,7 +213,7 @@ export default function AccountPage() {
         : "Confirmation code";
 
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={load}>
       <div className="page-header">
         <div>
           <h1>Account</h1>

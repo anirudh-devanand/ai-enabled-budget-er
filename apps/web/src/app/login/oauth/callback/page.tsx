@@ -6,6 +6,7 @@ import { isMfaChallenge } from "@woney/api-client";
 import { readOAuthProvider } from "@/components/SsoButtons";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
+import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 
 function OAuthCallbackInner() {
@@ -28,6 +29,7 @@ function OAuthCallbackInner() {
           router.replace("/login");
           return;
         }
+        kickoffBankSync();
         router.replace("/dashboard");
       } catch (err) {
         setError(authErrorMessage(err, "Sign-in failed"));

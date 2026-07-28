@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const netBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
 
   return (
-    <AppShell householdId={household?.id}>
+    <AppShell householdId={household?.id} onRefresh={load}>
       <div className="page-header">
         <div>
           <h1>Hello, {user.display_name.split(" ")[0]}</h1>

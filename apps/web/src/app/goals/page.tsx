@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { GoalResponse, GoalType, PlanResponse } from "@woney/api-client";
 import { GoalRing } from "@/components/charts/GoalRing";
 import { AppShell } from "@/components/ui";
@@ -41,6 +41,10 @@ export default function GoalsPage() {
   async function refresh(hid: string) {
     setGoals(await api.listGoals(hid));
   }
+
+  const reload = useCallback(async () => {
+    if (householdId) await refresh(householdId);
+  }, [householdId]);
 
   useEffect(() => {
     (async () => {
@@ -132,7 +136,7 @@ export default function GoalsPage() {
   }
 
   return (
-    <AppShell householdId={householdId}>
+    <AppShell householdId={householdId} onRefresh={reload}>
       <div className="page-header">
         <div>
           <h1>Goals</h1>

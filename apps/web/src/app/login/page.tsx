@@ -7,6 +7,7 @@ import { isMfaChallenge, type OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
 import { SsoButtons } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
+import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 
 export default function LoginPage() {
@@ -42,6 +43,7 @@ export default function LoginPage() {
       if (isMfaChallenge(result)) {
         setChallengeToken(result.challenge_token);
       } else {
+        kickoffBankSync();
         router.replace("/dashboard");
       }
     } catch (err) {
@@ -58,6 +60,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await api.verifyMfa(challengeToken, code);
+      kickoffBankSync();
       router.replace("/dashboard");
     } catch (err) {
       setError(authErrorMessage(err, "Could not verify code."));
