@@ -17,8 +17,10 @@ from app.auth.schemas import (
     MfaActivateRequest,
     MfaActivateResponse,
     MfaChallengeResponse,
+    MfaDisableRequest,
     MfaEnrollResponse,
     MfaRecoveryCodesResponse,
+    MfaResendRequest,
     MfaVerifyRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
@@ -34,7 +36,6 @@ from app.core.rate_limit import check_rate_limit
 from app.core.security import (
     MFA_CHALLENGE_TOKEN,
     assert_password_strength,
-    create_mfa_challenge_token,
     decode_token,
     hash_password,
     verify_password,
@@ -74,6 +75,7 @@ async def register(body: RegisterRequest, db: DbDep, request: Request) -> User:
         email=body.email.lower(),
         password_hash=hash_password(body.password),
         display_name=body.display_name,
+        mfa_enabled=True,  # Email MFA on by default; can disable later in Account.
     )
     db.add(user)
     await db.flush()
@@ -99,7 +101,7 @@ async def login(body: LoginRequest, db: DbDep, request: Request, response: Respo
         )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if user.mfa_enabled:
-        return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
+        return await service.issue_login_mfa_challenge(db, user)
     pair = await _issue_and_set_cookie(db, response, request, user.id)
     await record_security_event(
         db,
@@ -124,7 +126,7 @@ async def mfa_verify(
         )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
     user = await db.get(User, user_id)
-    if user is None or not service.verify_mfa_code(user, body.code):
+    if user is None or not await service.verify_login_mfa(db, user, body.code):
         await record_security_event(
             db,
             event_type="mfa_verify_failed",
@@ -134,12 +136,23 @@ async def mfa_verify(
             commit=True,
         )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code")
-    await db.commit()
     pair = await _issue_and_set_cookie(db, response, request, user.id)
     await record_security_event(
         db, event_type="mfa_verify_success", user_id=user.id, request=request, commit=True
     )
     return pair
+
+
+@router.post("/mfa/resend", response_model=MfaChallengeResponse)
+async def mfa_resend(body: MfaResendRequest, db: DbDep, request: Request) -> MfaChallengeResponse:
+    check_rate_limit(request, bucket="auth-mfa-resend", limit=8, window_seconds=900)
+    user_id = decode_token(body.challenge_token, MFA_CHALLENGE_TOKEN)
+    if user_id is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
+    user = await db.get(User, user_id)
+    if user is None or not user.mfa_enabled:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
+    return await service.issue_login_mfa_challenge(db, user)
 
 
 @router.post("/refresh", response_model=TokenPair)
@@ -196,18 +209,23 @@ async def logout_all(user: CurrentUser, db: DbDep, request: Request, response: R
 
 @router.post("/mfa/enroll", response_model=MfaEnrollResponse)
 async def mfa_enroll(user: CurrentUser, db: DbDep) -> MfaEnrollResponse:
-    if user.mfa_enabled:
-        raise HTTPException(status.HTTP_409_CONFLICT, "MFA already enabled")
+    """Start authenticator enrollment (QR). Allowed while email MFA is already on."""
+    if service.authenticator_enabled(user):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Authenticator already enabled")
     secret, encrypted, uri = service.build_mfa_enrollment(user)
     user.mfa_secret = encrypted
+    # Clear prior recovery hashes until activate completes.
+    user.mfa_recovery_hashes = None
     await db.commit()
     return MfaEnrollResponse(secret=secret, otpauth_uri=uri)
 
 
 @router.post("/mfa/activate", response_model=MfaActivateResponse)
 async def mfa_activate(body: MfaActivateRequest, user: CurrentUser, db: DbDep) -> MfaActivateResponse:
-    if user.mfa_enabled:
-        raise HTTPException(status.HTTP_409_CONFLICT, "MFA already enabled")
+    if service.authenticator_enabled(user):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Authenticator already enabled")
+    if not user.mfa_secret:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Start enrollment first")
     if not service.verify_totp(user, body.code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid code")
     codes, hashes = service.generate_recovery_codes()
@@ -219,12 +237,39 @@ async def mfa_activate(body: MfaActivateRequest, user: CurrentUser, db: DbDep) -
 
 @router.post("/mfa/recovery-codes", response_model=MfaRecoveryCodesResponse)
 async def regenerate_recovery_codes(user: CurrentUser, db: DbDep) -> MfaRecoveryCodesResponse:
-    if not user.mfa_enabled:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "MFA is not enabled")
+    if not service.authenticator_enabled(user):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Authenticator is not enabled")
     codes, hashes = service.generate_recovery_codes()
     user.mfa_recovery_hashes = hashes
     await db.commit()
     return MfaRecoveryCodesResponse(recovery_codes=codes)
+
+
+@router.post("/mfa/disable", status_code=status.HTTP_204_NO_CONTENT)
+async def mfa_disable(body: MfaDisableRequest, user: CurrentUser, db: DbDep, request: Request) -> None:
+    """Turn off login MFA (email + authenticator challenges)."""
+    if not user.mfa_enabled:
+        return
+    if user.password_hash:
+        if not body.password or not verify_password(body.password, user.password_hash):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Password required to disable MFA")
+    user.mfa_enabled = False
+    await db.commit()
+    await record_security_event(
+        db, event_type="mfa_disabled", user_id=user.id, request=request, commit=True
+    )
+
+
+@router.post("/mfa/enable", status_code=status.HTTP_204_NO_CONTENT)
+async def mfa_enable(user: CurrentUser, db: DbDep, request: Request) -> None:
+    """Turn on email MFA for sign-in (default for new accounts)."""
+    if user.mfa_enabled:
+        return
+    user.mfa_enabled = True
+    await db.commit()
+    await record_security_event(
+        db, event_type="mfa_enabled", user_id=user.id, request=request, commit=True
+    )
 
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestResponse)
@@ -286,6 +331,7 @@ async def _oauth_upsert_and_issue(
             display_name=display_name,
             oauth_provider=provider,
             oauth_subject=subject,
+            mfa_enabled=True,
         )
         db.add(user)
         await db.flush()
@@ -296,7 +342,7 @@ async def _oauth_upsert_and_issue(
     await db.commit()
     await db.refresh(user)
     if user.mfa_enabled:
-        return MfaChallengeResponse(challenge_token=create_mfa_challenge_token(user.id))
+        return await service.issue_login_mfa_challenge(db, user)
     pair = await _issue_and_set_cookie(db, response, request, user.id)
     await record_security_event(
         db,

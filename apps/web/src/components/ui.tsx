@@ -73,7 +73,7 @@ export function AppShell({
   async function handleRefresh() {
     setToast(null);
     if (mfaEnabled === false) {
-      setToast("Enable 2FA on Account before syncing banks");
+      setToast("Turn on email MFA in Account before syncing banks");
       setTimeout(() => setToast(null), 3200);
       return;
     }
@@ -89,7 +89,7 @@ export function AppShell({
     } catch (err) {
       const detail = err instanceof Error ? err.message : "";
       if (/mfa_required/i.test(detail)) {
-        setToast("Enable 2FA on Account before syncing banks");
+        setToast("Turn on email MFA in Account before syncing banks");
       } else {
         setToast("Could not sync banks");
       }
@@ -137,8 +137,8 @@ export function AppShell({
         </div>
         {mfaEnabled === false && (
           <div className="security-banner" role="status">
-            Turn on two-factor authentication before linking banks.{" "}
-            <Link href="/account">Account → Security</Link>
+            Turn on email MFA before linking banks.{" "}
+            <Link href="/account#security">Account → Security</Link>
           </div>
         )}
         {toast && <div className="toast app-chrome-toast">{toast}</div>}

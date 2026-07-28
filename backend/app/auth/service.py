@@ -7,11 +7,12 @@ import pyotp
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import AuthSession
-from app.auth.schemas import TokenPair
+from app.auth.models import AuthSession, MfaLoginChallenge
+from app.auth.schemas import MfaChallengeResponse, TokenPair
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
+    create_mfa_challenge_token,
     decrypt_secret,
     encrypt_secret,
     generate_refresh_token,
@@ -20,6 +21,128 @@ from app.core.security import (
 from app.users.models import User
 
 RECOVERY_CODE_COUNT = 10
+EMAIL_OTP_TTL_SECONDS = 600
+EMAIL_OTP_MAX_ATTEMPTS = 5
+
+
+def authenticator_enabled(user: User) -> bool:
+    """True once TOTP has been activated (recovery codes issued)."""
+    return bool(user.mfa_secret and user.mfa_recovery_hashes)
+
+
+def _generate_email_otp() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+async def issue_login_mfa_challenge(
+    db: AsyncSession, user: User
+) -> MfaChallengeResponse:
+    """Create email OTP (primary) + JWT challenge. Authenticator is secondary if enrolled."""
+    from app.account.email import email_configured, send_login_mfa_code
+
+    now = datetime.now(UTC)
+    existing = await db.execute(
+        select(MfaLoginChallenge).where(
+            MfaLoginChallenge.user_id == user.id,
+            MfaLoginChallenge.consumed_at.is_(None),
+        )
+    )
+    for row in existing.scalars().all():
+        row.consumed_at = now
+
+    plain = _generate_email_otp()
+    db.add(
+        MfaLoginChallenge(
+            user_id=user.id,
+            code_hash=hash_refresh_token(plain),
+            expires_at=now + timedelta(seconds=EMAIL_OTP_TTL_SECONDS),
+        )
+    )
+    await db.commit()
+
+    emailed = False
+    if email_configured():
+        emailed = await send_login_mfa_code(user.email, plain)
+
+    totp_ok = authenticator_enabled(user)
+    settings = get_settings()
+    dev_code: str | None = None
+    if emailed:
+        primary = "email"
+        message = "We sent a 6-digit code to your email."
+    elif totp_ok:
+        primary = "totp"
+        message = "Enter the code from your authenticator app (or a recovery code)."
+    elif settings.env != "production":
+        primary = "inline"
+        message = "Email is not configured — use the one-time code shown below."
+        dev_code = plain
+    else:
+        # Production without Resend and without authenticator — still issue challenge;
+        # user must have enrolled authenticator or configure email.
+        if totp_ok:
+            primary = "totp"
+            message = "Enter the code from your authenticator app."
+        else:
+            primary = "email"
+            message = (
+                "Sign-in email could not be sent. Add an authenticator in Account → Security, "
+                "or contact support."
+            )
+
+    return MfaChallengeResponse(
+        challenge_token=create_mfa_challenge_token(user.id),
+        primary_method=primary,
+        totp_available=totp_ok,
+        message=message,
+        dev_code=dev_code,
+    )
+
+
+async def verify_email_login_otp(db: AsyncSession, user_id: uuid.UUID, code: str) -> bool:
+    cleaned = code.strip()
+    if not cleaned.isdigit() or len(cleaned) != 6:
+        return False
+    now = datetime.now(UTC)
+    result = await db.execute(
+        select(MfaLoginChallenge)
+        .where(
+            MfaLoginChallenge.user_id == user_id,
+            MfaLoginChallenge.consumed_at.is_(None),
+        )
+        .order_by(MfaLoginChallenge.created_at.desc())
+        .limit(1)
+    )
+    challenge = result.scalar_one_or_none()
+    if challenge is None:
+        return False
+    expires = challenge.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+    if expires < now:
+        return False
+    if challenge.attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
+        return False
+    challenge.attempt_count += 1
+    if challenge.code_hash != hash_refresh_token(cleaned):
+        await db.commit()
+        return False
+    challenge.consumed_at = now
+    await db.commit()
+    return True
+
+
+async def verify_login_mfa(
+    db: AsyncSession, user: User, code: str
+) -> bool:
+    """Accept email OTP, TOTP, or recovery code."""
+    if await verify_email_login_otp(db, user.id, code):
+        return True
+    if verify_mfa_code(user, code):
+        await db.commit()
+        return True
+    return False
+
 
 
 async def issue_token_pair(

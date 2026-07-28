@@ -9,7 +9,7 @@ from app.connections.provider import (
 )
 from app.connections.router import get_provider
 from app.main import app
-from tests.conftest import enable_mfa, register_and_login
+from tests.conftest import disable_mfa, enable_mfa, register_and_login
 
 
 class FakeProvider:
@@ -80,9 +80,13 @@ def _snapshot(extra_txn: bool = False) -> ProviderSnapshot:
 
 async def _setup(client, payload, *, with_mfa: bool = True) -> tuple[dict, str]:
     tokens = await register_and_login(client, payload)
-    if with_mfa:
-        await enable_mfa(client, tokens)
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    if with_mfa:
+        # Email MFA already on at signup; enroll authenticator for bank-grade coverage.
+        await enable_mfa(client, tokens)
+    else:
+        # Turn off default email MFA so the bank gate returns 403.
+        await disable_mfa(client, tokens, payload["password"])
     resp = await client.get("/v1/households/", headers=headers)
     return headers, resp.json()[0]["id"]
 

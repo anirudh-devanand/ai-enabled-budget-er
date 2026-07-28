@@ -24,12 +24,26 @@ class TokenPair(BaseModel):
 class MfaChallengeResponse(BaseModel):
     mfa_required: bool = True
     challenge_token: str
+    primary_method: str = "email"  # email | totp | inline
+    totp_available: bool = False
+    message: str = "Enter your verification code"
+    # Only set in non-production when email is unavailable.
+    dev_code: str | None = None
 
 
 class MfaVerifyRequest(BaseModel):
     challenge_token: str
-    # TOTP (6–8 digits) or recovery code (e.g. ABCD-EF01).
+    # Email OTP (6 digits), TOTP, or recovery code.
     code: str = Field(min_length=6, max_length=32)
+
+
+class MfaResendRequest(BaseModel):
+    challenge_token: str
+
+
+class MfaDisableRequest(BaseModel):
+    # Password accounts must confirm password; OAuth-only may omit.
+    password: str | None = None
 
 
 class RefreshRequest(BaseModel):

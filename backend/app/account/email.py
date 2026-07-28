@@ -72,3 +72,16 @@ async def send_password_reset_link(to_email: str, reset_url: str) -> bool:
             "will stay the same."
         ),
     )
+
+
+async def send_login_mfa_code(to_email: str, code: str) -> bool:
+    """Send a one-time sign-in code. Returns True if accepted by the provider."""
+    return await _send_resend(
+        to_email,
+        "Your Woney sign-in code",
+        (
+            f"Your Woney sign-in code is: {code}\n\n"
+            "It expires in 10 minutes. If you did not try to sign in, ignore this email "
+            "and secure your account."
+        ),
+    )

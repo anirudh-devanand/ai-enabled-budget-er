@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import pyotp
-
 from app.core.security import decrypt_field, encrypt_field
-from tests.conftest import enable_mfa, register_and_login
+from tests.conftest import disable_mfa, login_complete, register_and_login
+
+_COOKIE_HDR = {"X-Woney-Session": "cookie"}
 
 
 async def test_refresh_via_http_only_cookie(client, register_payload):
     await client.post("/v1/auth/register", json=register_payload)
-    login = await client.post(
-        "/v1/auth/login",
-        json={"email": register_payload["email"], "password": register_payload["password"]},
-        headers={"X-Woney-Session": "cookie"},
+    login, body = await login_complete(
+        client,
+        register_payload["email"],
+        register_payload["password"],
+        headers=_COOKIE_HDR,
     )
-    assert login.status_code == 200
-    body = login.json()
     assert body["access_token"]
     assert body["refresh_token"] == ""
     assert "woney_refresh" in login.cookies
@@ -24,7 +23,7 @@ async def test_refresh_via_http_only_cookie(client, register_payload):
     refreshed = await client.post(
         "/v1/auth/refresh",
         json={},
-        headers={"X-Woney-Session": "cookie"},
+        headers=_COOKIE_HDR,
     )
     assert refreshed.status_code == 200, refreshed.text
     assert refreshed.json()["refresh_token"] == ""
@@ -41,22 +40,25 @@ async def test_refresh_still_accepts_body_token(client, register_payload):
 
 async def test_logout_clears_refresh_cookie(client, register_payload):
     await client.post("/v1/auth/register", json=register_payload)
-    login = await client.post(
-        "/v1/auth/login",
-        json={"email": register_payload["email"], "password": register_payload["password"]},
-        headers={"X-Woney-Session": "cookie"},
+    login, _ = await login_complete(
+        client,
+        register_payload["email"],
+        register_payload["password"],
+        headers=_COOKIE_HDR,
     )
     assert "woney_refresh" in login.cookies
-    out = await client.post("/v1/auth/logout", json={}, headers={"X-Woney-Session": "cookie"})
+    out = await client.post("/v1/auth/logout", json={}, headers=_COOKIE_HDR)
     assert out.status_code == 204
     # Cookie cleared — refresh without body must fail
-    bad = await client.post("/v1/auth/refresh", json={}, headers={"X-Woney-Session": "cookie"})
+    bad = await client.post("/v1/auth/refresh", json={}, headers=_COOKIE_HDR)
     assert bad.status_code == 401
 
 
 async def test_plaid_link_requires_mfa(client, register_payload):
     tokens = await register_and_login(client, register_payload)
     auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+    # Email MFA is on at signup — disable to exercise the bank gate.
+    await disable_mfa(client, tokens, register_payload["password"])
     households = (await client.get("/v1/households/", headers=auth)).json()
     hid = households[0]["id"]
     resp = await client.post(
@@ -67,7 +69,9 @@ async def test_plaid_link_requires_mfa(client, register_payload):
     assert resp.status_code == 403
     assert resp.json()["detail"] == "mfa_required"
 
-    await enable_mfa(client, tokens)
+    # Re-enable email MFA (or authenticator); gate must clear.
+    resp_on = await client.post("/v1/auth/mfa/enable", headers=auth)
+    assert resp_on.status_code == 204
     # After MFA, may be 503 if Plaid unset — but not 403 mfa_required
     resp2 = await client.post(
         "/v1/connections/plaid/link-token",
@@ -80,6 +84,7 @@ async def test_plaid_link_requires_mfa(client, register_payload):
 async def test_sync_mine_requires_mfa(client, register_payload):
     tokens = await register_and_login(client, register_payload)
     auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+    await disable_mfa(client, tokens, register_payload["password"])
     resp = await client.post("/v1/connections/sync-mine", headers=auth)
     assert resp.status_code == 403
     assert resp.json()["detail"] == "mfa_required"

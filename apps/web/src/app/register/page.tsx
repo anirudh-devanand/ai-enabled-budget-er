@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { OAuthProvider } from "@woney/api-client";
+import { isMfaChallenge, type OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
 import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
@@ -46,7 +46,13 @@ export default function RegisterPage() {
     setBusy(true);
     try {
       await api.register(email, password, displayName);
-      await api.login(email, password);
+      const result = await api.login(email, password);
+      if (isMfaChallenge(result)) {
+        const { storeMfaChallenge } = await import("@/lib/mfaChallenge");
+        storeMfaChallenge(result);
+        router.replace("/login?mfa=1");
+        return;
+      }
       kickoffBankSync();
       router.replace("/dashboard");
     } catch (err) {

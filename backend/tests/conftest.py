@@ -56,18 +56,54 @@ def register_payload():
     }
 
 
+async def complete_mfa_if_needed(client, resp, *, headers: dict | None = None):
+    """If login/OAuth returned an MFA challenge, verify with inline ``dev_code``.
+
+    Returns the final response (token-bearing) and its JSON body.
+    """
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    if not body.get("mfa_required"):
+        return resp, body
+    code = body.get("dev_code")
+    assert code, "expected inline MFA code when email is not configured in tests"
+    kwargs = {"json": {"challenge_token": body["challenge_token"], "code": code}}
+    if headers:
+        kwargs["headers"] = headers
+    verified = await client.post("/v1/auth/mfa/verify", **kwargs)
+    assert verified.status_code == 200, verified.text
+    return verified, verified.json()
+
+
+async def login_complete(client, email: str, password: str, *, headers: dict | None = None):
+    """Password login + MFA verify when challenged. Returns (response, token body)."""
+    kwargs: dict = {"json": {"email": email, "password": password}}
+    if headers:
+        kwargs["headers"] = headers
+    resp = await client.post("/v1/auth/login", **kwargs)
+    return await complete_mfa_if_needed(client, resp, headers=headers)
+
+
 async def register_and_login(client, payload) -> dict:
     resp = await client.post("/v1/auth/register", json=payload)
     assert resp.status_code == 201, resp.text
+    _, body = await login_complete(client, payload["email"], payload["password"])
+    return body
+
+
+async def disable_mfa(client, tokens: dict, password: str) -> None:
+    """Turn off login MFA (email + authenticator challenges)."""
+    auth = {"Authorization": f"Bearer {tokens['access_token']}"}
     resp = await client.post(
-        "/v1/auth/login", json={"email": payload["email"], "password": payload["password"]}
+        "/v1/auth/mfa/disable",
+        json={"password": password},
+        headers=auth,
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()
+    assert resp.status_code == 204, resp.text
 
 
 async def enable_mfa(client, tokens: dict) -> str:
-    """Enroll + activate TOTP MFA; returns the TOTP secret."""
+    """Enroll + activate TOTP authenticator; returns the TOTP secret."""
     auth = {"Authorization": f"Bearer {tokens['access_token']}"}
     resp = await client.post("/v1/auth/mfa/enroll", headers=auth)
     assert resp.status_code == 200, resp.text

@@ -8,6 +8,7 @@ import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
+import { storeMfaChallenge } from "@/lib/mfaChallenge";
 
 function OAuthCallbackInner() {
   const router = useRouter();
@@ -26,7 +27,8 @@ function OAuthCallbackInner() {
       try {
         const result = await api.loginWithOAuthCode(provider, code, redirectUri);
         if (isMfaChallenge(result)) {
-          router.replace("/login");
+          storeMfaChallenge(result);
+          router.replace("/login?mfa=1");
           return;
         }
         kickoffBankSync();

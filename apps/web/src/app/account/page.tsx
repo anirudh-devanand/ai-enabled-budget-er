@@ -60,6 +60,8 @@ export default function AccountPage() {
   const [mfaSecret, setMfaSecret] = useState<string | null>(null);
   const [mfaUri, setMfaUri] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
+  const [showManualSecret, setShowManualSecret] = useState(false);
+  const [disablePassword, setDisablePassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   const load = useCallback(async () => {
@@ -207,6 +209,7 @@ export default function AccountPage() {
     setMfaBusy(true);
     setMfaError(null);
     setRecoveryCodes(null);
+    setShowManualSecret(false);
     try {
       const enrolled = await api.enrollMfa();
       setMfaSecret(enrolled.secret);
@@ -229,13 +232,49 @@ export default function AccountPage() {
       setMfaSecret(null);
       setMfaUri(null);
       setMfaCode("");
+      setShowManualSecret(false);
       const me = await api.me();
       setUser(me);
-      setToast("MFA enabled");
+      setToast("Authenticator enabled");
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
       else setMfaError(getApiDetail(err, "Invalid authenticator code"));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function disableMfa() {
+    setMfaBusy(true);
+    setMfaError(null);
+    try {
+      await api.disableMfa(disablePassword || undefined);
+      setDisablePassword("");
+      const me = await api.me();
+      setUser(me);
+      setToast("Sign-in MFA turned off");
+      setTimeout(() => setToast(null), 2500);
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setMfaError(getApiDetail(err, "Could not disable MFA"));
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function enableEmailMfa() {
+    setMfaBusy(true);
+    setMfaError(null);
+    try {
+      await api.enableMfa();
+      const me = await api.me();
+      setUser(me);
+      setToast("Email MFA turned on");
+      setTimeout(() => setToast(null), 2500);
+    } catch (err) {
+      if (isUnauthorized(err)) router.replace("/login");
+      else setMfaError(getApiDetail(err, "Could not enable MFA"));
     } finally {
       setMfaBusy(false);
     }
@@ -329,36 +368,101 @@ export default function AccountPage() {
         <section className="account-panel" id="security">
           <h3>Security</h3>
           <p className="panel-lede">
-            Multi-factor authentication is required before linking a live bank with Plaid.
-            CSV import and demo data do not require MFA.
+            Sign-in MFA is on by default: we email you a code each time you sign in. You can add an
+            authenticator app as a backup, or turn MFA off later.
           </p>
           {user.mfa_enabled ? (
             <>
               <p className="muted" style={{ marginTop: 0 }}>
-                MFA is <strong>enabled</strong> on this account.
+                Email MFA is <strong>on</strong>
+                {user.authenticator_enabled ? " · Authenticator app linked" : ""}.
+              </p>
+              {!user.authenticator_enabled && !mfaSecret && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={startMfaEnroll}
+                  disabled={mfaBusy}
+                  style={{ marginRight: 8 }}
+                >
+                  {mfaBusy ? "Starting…" : "Add authenticator app"}
+                </button>
+              )}
+              {user.authenticator_enabled && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={regenRecoveryCodes}
+                  disabled={mfaBusy}
+                  style={{ marginRight: 8 }}
+                >
+                  {mfaBusy ? "Working…" : "Regenerate recovery codes"}
+                </button>
+              )}
+              <div className="stack" style={{ gap: 10, marginTop: 14, maxWidth: 360 }}>
+                <div className="field">
+                  <label htmlFor="disable-mfa-password">Password to turn MFA off</label>
+                  <input
+                    id="disable-mfa-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={disablePassword}
+                    onChange={(e) => setDisablePassword(e.target.value)}
+                    placeholder={user.email.includes("@") ? "Required if you use a password" : ""}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={disableMfa}
+                  disabled={mfaBusy}
+                >
+                  Turn off MFA
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="muted" style={{ marginTop: 0 }}>
+                MFA is <strong>off</strong>. Bank linking requires it to be on.
               </p>
               <button
                 type="button"
-                className="btn btn-ghost"
-                onClick={regenRecoveryCodes}
+                className="btn btn-primary"
+                onClick={enableEmailMfa}
                 disabled={mfaBusy}
               >
-                {mfaBusy ? "Working…" : "Regenerate recovery codes"}
+                {mfaBusy ? "Enabling…" : "Turn on email MFA"}
               </button>
             </>
-          ) : mfaSecret ? (
-            <div className="stack" style={{ gap: 12 }}>
+          )}
+          {mfaSecret ? (
+            <div className="stack" style={{ gap: 12, marginTop: 16 }}>
               <p className="muted" style={{ marginTop: 0 }}>
-                Add this secret to your authenticator app, then enter a 6-digit code.
+                Scan this QR code with your authenticator app, then enter the 6-digit code.
               </p>
-              <div className="field">
-                <label htmlFor="mfa-secret">Secret</label>
-                <input id="mfa-secret" value={mfaSecret} readOnly className="mono" />
-              </div>
               {mfaUri && (
-                <p className="muted" style={{ fontSize: "0.8rem", wordBreak: "break-all" }}>
-                  {mfaUri}
-                </p>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mfaUri)}`}
+                  alt="Authenticator QR code"
+                  width={200}
+                  height={200}
+                  style={{ borderRadius: 12, background: "#fff", padding: 8 }}
+                />
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setShowManualSecret((v) => !v)}
+              >
+                {showManualSecret ? "Hide manual setup" : "Can’t scan? Enter key manually"}
+              </button>
+              {showManualSecret && (
+                <div className="field">
+                  <label htmlFor="mfa-secret">Secret key</label>
+                  <input id="mfa-secret" value={mfaSecret} readOnly className="mono" />
+                </div>
               )}
               <div className="field">
                 <label htmlFor="mfa-code">Authenticator code</label>
@@ -378,21 +482,11 @@ export default function AccountPage() {
                 onClick={activateMfa}
                 disabled={mfaBusy || mfaCode.trim().length < 6}
               >
-                {mfaBusy ? "Activating…" : "Activate MFA"}
+                {mfaBusy ? "Activating…" : "Confirm authenticator"}
               </button>
             </div>
           ) : (
-            <>
-              {mfaError && <div className="error">{mfaError}</div>}
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={startMfaEnroll}
-                disabled={mfaBusy}
-              >
-                {mfaBusy ? "Starting…" : "Enable MFA"}
-              </button>
-            </>
+            mfaError && <div className="error" style={{ marginTop: 12 }}>{mfaError}</div>
           )}
           {recoveryCodes && recoveryCodes.length > 0 && (
             <div style={{ marginTop: 16 }}>
@@ -406,8 +500,7 @@ export default function AccountPage() {
               </ul>
             </div>
           )}
-        </section>
-      </div>
+        </section>      </div>
 
       <div className="section-title">Linked banks</div>
       <div className="list-card" style={{ marginBottom: 28, overflow: "hidden" }}>

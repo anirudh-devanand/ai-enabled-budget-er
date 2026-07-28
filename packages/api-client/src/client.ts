@@ -19,6 +19,7 @@ import type {
   MessageResponse,
   MfaEnrollResponse,
   MfaActivateResponse,
+  MfaChallengeResponse,
   NamedAmount,
   NetWorthResponse,
   OAuthProvider,
@@ -194,6 +195,25 @@ export class WoneyClient {
     });
     this.storage.setTokens(pair);
     return pair;
+  }
+
+  resendMfa(challengeToken: string) {
+    return this.request<MfaChallengeResponse>("POST", "/v1/auth/mfa/resend", {
+      challenge_token: challengeToken,
+    });
+  }
+
+  disableMfa(password?: string) {
+    return this.request<void>(
+      "POST",
+      "/v1/auth/mfa/disable",
+      password ? { password } : {},
+      { auth: true },
+    );
+  }
+
+  enableMfa() {
+    return this.request<void>("POST", "/v1/auth/mfa/enable", undefined, { auth: true });
   }
 
   async logout(): Promise<void> {

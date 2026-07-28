@@ -11,7 +11,12 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { ApiError, isMfaChallenge, type UserResponse } from "@woney/api-client";
+import {
+  ApiError,
+  isMfaChallenge,
+  type MfaChallengeResponse,
+  type UserResponse,
+} from "@woney/api-client";
 import { api } from "./src/api";
 import { PasswordStrength } from "./src/components/ui";
 import { colors, passwordScore } from "./src/theme";
@@ -38,7 +43,8 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallengeResponse | null>(null);
+  const [useAuthenticator, setUseAuthenticator] = useState(false);
   const [code, setCode] = useState("");
   const [user, setUser] = useState<UserResponse | null>(null);
   const [tab, setTab] = useState<Tab>("home");
@@ -71,13 +77,19 @@ export default function App() {
     }
   }
 
+  function applyChallenge(result: MfaChallengeResponse) {
+    setMfaChallenge(result);
+    setUseAuthenticator(result.primary_method === "totp");
+    setCode("");
+  }
+
   async function login() {
     setError(null);
     setBusy(true);
     try {
       const result = await api.login(email, password);
       if (isMfaChallenge(result)) {
-        setChallengeToken(result.challenge_token);
+        applyChallenge(result);
       } else {
         kickoffSync();
         setUser(await api.me());
@@ -106,12 +118,12 @@ export default function App() {
   }
 
   async function verify() {
-    if (!challengeToken) return;
+    if (!mfaChallenge) return;
     setError(null);
     setBusy(true);
     try {
-      await api.verifyMfa(challengeToken, code);
-      setChallengeToken(null);
+      await api.verifyMfa(mfaChallenge.challenge_token, code);
+      setMfaChallenge(null);
       kickoffSync();
       setUser(await api.me());
     } catch (err) {
@@ -120,6 +132,27 @@ export default function App() {
       setBusy(false);
     }
   }
+
+  async function resendEmailCode() {
+    if (!mfaChallenge) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const next = await api.resendMfa(mfaChallenge.challenge_token);
+      applyChallenge(next);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Could not resend code");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showingEmail =
+    mfaChallenge &&
+    !useAuthenticator &&
+    (mfaChallenge.primary_method === "email" ||
+      mfaChallenge.primary_method === "inline" ||
+      !mfaChallenge.primary_method);
 
   async function logout() {
     await api.logout();
@@ -146,18 +179,26 @@ export default function App() {
 
             <View style={styles.authCard}>
               <View style={styles.goldEdge} />
-              {challengeToken ? (
+              {mfaChallenge ? (
                 <>
                   <Text style={styles.authTitle}>Confirm it’s you</Text>
-                  <Text style={styles.authSub}>Authenticator or recovery code</Text>
+                  <Text style={styles.authSub}>
+                    {showingEmail
+                      ? mfaChallenge.message || "Enter the code we emailed you"
+                      : "Enter the code from your authenticator app"}
+                  </Text>
+                  {showingEmail && mfaChallenge.dev_code ? (
+                    <Text style={styles.authSub}>Dev code: {mfaChallenge.dev_code}</Text>
+                  ) : null}
                   <TextInput
                     style={styles.authInput}
                     value={code}
                     onChangeText={setCode}
-                    autoCapitalize="characters"
+                    autoCapitalize={showingEmail ? "none" : "characters"}
+                    keyboardType="number-pad"
                     autoComplete="one-time-code"
                     textContentType="oneTimeCode"
-                    placeholder="123456 or ABCD-EF01"
+                    placeholder={showingEmail ? "6-digit email code" : "123456 or ABCD-EF01"}
                     placeholderTextColor={colors.authMuted}
                   />
                   <Pressable style={styles.goldButton} onPress={verify} disabled={busy}>
@@ -167,6 +208,28 @@ export default function App() {
                       <Text style={styles.goldButtonText}>Verify</Text>
                     )}
                   </Pressable>
+                  {showingEmail ? (
+                    <Pressable onPress={resendEmailCode} disabled={busy} style={{ marginTop: 12 }}>
+                      <Text style={styles.authLink}>Resend email code</Text>
+                    </Pressable>
+                  ) : null}
+                  {mfaChallenge.totp_available ? (
+                    <Pressable
+                      onPress={() => {
+                        setUseAuthenticator(!useAuthenticator);
+                        setCode("");
+                        setError(null);
+                      }}
+                      disabled={busy}
+                      style={{ marginTop: 12 }}
+                    >
+                      <Text style={styles.authLink}>
+                        {useAuthenticator
+                          ? "Use email code instead"
+                          : "Use authenticator app instead"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </>
               ) : (
                 <>

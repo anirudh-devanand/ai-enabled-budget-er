@@ -3,6 +3,7 @@ export interface UserResponse {
   email: string;
   display_name: string;
   mfa_enabled: boolean;
+  authenticator_enabled?: boolean;
   created_at: string;
 }
 
@@ -15,6 +16,10 @@ export interface TokenPair {
 export interface MfaChallengeResponse {
   mfa_required: true;
   challenge_token: string;
+  primary_method?: "email" | "totp" | "inline";
+  totp_available?: boolean;
+  message?: string;
+  dev_code?: string | null;
 }
 
 export type LoginResponse = TokenPair | MfaChallengeResponse;

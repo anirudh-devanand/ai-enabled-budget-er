@@ -11,4 +11,5 @@ class UserResponse(BaseModel):
     email: str
     display_name: str
     mfa_enabled: bool
+    authenticator_enabled: bool = False
     created_at: datetime

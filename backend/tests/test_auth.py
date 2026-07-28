@@ -1,6 +1,6 @@
 import pyotp
 
-from tests.conftest import register_and_login
+from tests.conftest import login_complete, register_and_login
 
 
 async def test_register_creates_user_and_personal_household(client, register_payload):
@@ -8,7 +8,7 @@ async def test_register_creates_user_and_personal_household(client, register_pay
     assert resp.status_code == 201
     body = resp.json()
     assert body["email"] == "ada@example.com"
-    assert body["mfa_enabled"] is False
+    assert body["mfa_enabled"] is True
     assert "password" not in resp.text
 
     tokens = await register_and_login(
@@ -76,11 +76,9 @@ async def test_logout_revokes_session(client, register_payload):
 
 async def test_logout_all_revokes_every_session(client, register_payload):
     tokens_a = await register_and_login(client, register_payload)
-    resp = await client.post(
-        "/v1/auth/login",
-        json={"email": register_payload["email"], "password": register_payload["password"]},
+    _, tokens_b = await login_complete(
+        client, register_payload["email"], register_payload["password"]
     )
-    tokens_b = resp.json()
 
     resp = await client.post(
         "/v1/auth/logout-all", headers={"Authorization": f"Bearer {tokens_a['access_token']}"}
@@ -156,11 +154,9 @@ async def test_mfa_enroll_activate_and_login_flow(client, register_payload):
 
 async def test_refresh_and_logout_via_httponly_cookie(client, register_payload):
     await register_and_login(client, register_payload)
-    login_resp = await client.post(
-        "/v1/auth/login",
-        json={"email": register_payload["email"], "password": register_payload["password"]},
+    login_resp, _ = await login_complete(
+        client, register_payload["email"], register_payload["password"]
     )
-    assert login_resp.status_code == 200
     assert "woney_refresh" in login_resp.cookies
     cookie_val = login_resp.cookies["woney_refresh"]
     set_cookie = login_resp.headers.get("set-cookie", "")
