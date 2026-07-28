@@ -70,13 +70,29 @@ async def _require_membership(db: AsyncSession, user: User, household_id: uuid.U
 
 
 
-def _require_mfa_enabled(user: User) -> None:
-    """Live bank linking (Plaid / Flinks) requires MFA. CSV + demo stay open for Neo users."""
+async def _require_mfa_enabled(
+    user: User, db: AsyncSession, request: Request | None = None
+) -> None:
+    """Bank connect/sync/import require MFA (stable detail for clients)."""
     if not user.mfa_enabled:
+        await record_security_event(
+            db,
+            event_type="mfa_gate_denied",
+            user_id=user.id,
+            request=request,
+            commit=True,
+        )
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "Enable multi-factor authentication before linking a live bank. "
-            "Go to Account → Security, then try again. CSV import and demo data do not require MFA.",
+            detail="mfa_required",
+        )
+
+
+async def _require_owner(db: AsyncSession, user: User, household_id: uuid.UUID) -> None:
+    if not await service.user_is_household_owner(db, user.id, household_id):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only household owners can link or sync banks",
         )
 
 
@@ -86,15 +102,16 @@ def _tx_responses(items, enrichments, merchants, categories) -> list[Transaction
         enrichment = enrichments.get(t.id)
         merchant = merchants.get(enrichment.merchant_id) if enrichment else None
         category = categories.get(enrichment.category_id) if enrichment else None
+        plain = service.transaction_plaintext_description(t)
         responses.append(
             TransactionResponse(
                 id=t.id,
                 account_id=t.account_id,
                 date=t.date,
-                raw_description=t.raw_description,
+                raw_description=plain,
                 amount=t.amount,
                 currency=t.currency,
-                display_name=merchant.name if merchant else prettify_descriptor(t.raw_description),
+                display_name=merchant.name if merchant else prettify_descriptor(plain),
                 merchant_name=merchant.name if merchant else None,
                 category_id=category.id if category else None,
                 category_name=category.name if category else None,
@@ -108,8 +125,9 @@ def _tx_responses(items, enrichments, merchants, categories) -> list[Transaction
 async def create_plaid_link_token(
     body: PlaidLinkTokenRequest, user: CurrentUser, db: DbDep, request: Request
 ):
-    _require_mfa_enabled(user)
+    await _require_mfa_enabled(user, db, request)
     await _require_membership(db, user, body.household_id)
+    await _require_owner(db, user, body.household_id)
     try:
         token = await PlaidProvider().create_link_token(client_user_id=str(user.id))
     except ProviderError as exc:
@@ -133,8 +151,9 @@ async def create_plaid_connection(
     provider: ProviderDep,
     request: Request,
 ):
-    _require_mfa_enabled(user)
+    await _require_mfa_enabled(user, db, request)
     await _require_membership(db, user, body.household_id)
+    await _require_owner(db, user, body.household_id)
     plaid = PlaidProvider()
     try:
         access_token = await plaid.exchange_public_token(body.public_token)
@@ -162,6 +181,7 @@ async def create_plaid_connection(
 async def import_csv_statement(
     user: CurrentUser,
     db: DbDep,
+    request: Request,
     household_id: Annotated[uuid.UUID, Form()],
     account_name: Annotated[str, Form()],
     file: UploadFile = File(...),
@@ -169,7 +189,9 @@ async def import_csv_statement(
     currency: Annotated[str, Form()] = "CAD",
     institution_name: Annotated[str | None, Form()] = None,
 ):
+    await _require_mfa_enabled(user, db, request)
     await _require_membership(db, user, household_id)
+    await _require_owner(db, user, household_id)
     raw = await file.read()
     if not raw:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
@@ -201,6 +223,14 @@ async def import_csv_statement(
     connection.last_synced_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(connection)
+    await record_security_event(
+        db,
+        event_type="csv_import",
+        user_id=user.id,
+        request=request,
+        meta={"connection_id": str(connection.id), "imported": len(new_transactions)},
+        commit=True,
+    )
     return CsvImportResponse(
         connection=ConnectionResponse.model_validate(connection),
         imported_transactions=len(new_transactions),
@@ -215,11 +245,10 @@ async def create_connection(
     provider: ProviderDep,
     request: Request,
 ):
+    await _require_mfa_enabled(user, db, request)
     await _require_membership(db, user, body.household_id)
+    await _require_owner(db, user, body.household_id)
     is_demo = body.login_id.startswith("demo-seed:")
-    # Live Flinks requires MFA; CSV/demo stay open (Neo and QA paths).
-    if not is_demo:
-        _require_mfa_enabled(user)
     provider_name = "demo" if is_demo else "flinks"
     connection = await service.create_connection(
         db, body.household_id, body.login_id, provider=provider_name
@@ -237,12 +266,22 @@ async def create_connection(
             meta={"connection_id": str(connection.id), "provider": "flinks"},
             commit=True,
         )
+    else:
+        await record_security_event(
+            db,
+            event_type="demo_connection_created",
+            user_id=user.id,
+            request=request,
+            meta={"connection_id": str(connection.id)},
+            commit=True,
+        )
     return connection
 
 
 @router.post("/sync-mine", response_model=SyncMineResponse)
 async def sync_mine(user: CurrentUser, db: DbDep, provider: ProviderDep, request: Request):
     """Sync all non-CSV bank connections for the current user's households."""
+    await _require_mfa_enabled(user, db, request)
     result = await service.sync_user_connections(db, user.id, provider)
     await record_security_event(
         db,
@@ -261,11 +300,17 @@ async def sync_mine(user: CurrentUser, db: DbDep, provider: ProviderDep, request
 
 @router.post("/{connection_id}/sync", response_model=ConnectionResponse)
 async def resync_connection(
-    connection_id: uuid.UUID, user: CurrentUser, db: DbDep, provider: ProviderDep
+    connection_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbDep,
+    provider: ProviderDep,
+    request: Request,
 ):
+    await _require_mfa_enabled(user, db, request)
     connection = await service.get_connection_for_user(db, connection_id, user.id)
     if connection is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    await _require_owner(db, user, connection.household_id)
     if connection.provider == "csv":
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -274,7 +319,38 @@ async def resync_connection(
     try:
         return await service.sync_connection(db, connection, provider)
     except ProviderError as exc:
+        await record_security_event(
+            db,
+            event_type="sync_failed",
+            user_id=user.id,
+            request=request,
+            meta={"connection_id": str(connection_id)},
+            commit=True,
+        )
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
+
+
+@router.patch("/accounts/{account_id}", response_model=AccountResponse)
+async def patch_account(
+    account_id: uuid.UUID, body: AccountUpdateRequest, user: CurrentUser, db: DbDep
+):
+    account = await service.get_account_for_user(db, account_id, user.id)
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    bank = await db.get(BankConnection, account.connection_id)
+    if bank is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    await _require_owner(db, user, bank.household_id)
+    account = await service.update_account(
+        db,
+        account,
+        nickname=body.nickname,
+        notes=body.notes,
+        hidden=body.hidden,
+    )
+    return AccountResponse(
+        **service.account_to_response(account, bank.institution_name if bank else None)
+    )
 
 
 @router.get("/", response_model=list[ConnectionResponse])
@@ -322,26 +398,6 @@ async def get_account(account_id: uuid.UUID, user: CurrentUser, db: DbDep):
     return AccountDetailResponse(
         **base,
         recent_transactions=_tx_responses(items, enrichments, merchants, categories),
-    )
-
-
-@router.patch("/accounts/{account_id}", response_model=AccountResponse)
-async def patch_account(
-    account_id: uuid.UUID, body: AccountUpdateRequest, user: CurrentUser, db: DbDep
-):
-    account = await service.get_account_for_user(db, account_id, user.id)
-    if account is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
-    account = await service.update_account(
-        db,
-        account,
-        nickname=body.nickname,
-        notes=body.notes,
-        hidden=body.hidden,
-    )
-    bank = await db.get(BankConnection, account.connection_id)
-    return AccountResponse(
-        **service.account_to_response(account, bank.institution_name if bank else None)
     )
 
 

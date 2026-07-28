@@ -23,8 +23,11 @@ class SecureTokenStorage implements TokenStorage {
   }
   setTokens(tokens: TokenPair) {
     this.access = tokens.access_token;
-    this.refresh = tokens.refresh_token;
-    SecureStore.setItem(REFRESH_KEY, tokens.refresh_token);
+    // Cookie-session responses may omit refresh; keep existing SecureStore value.
+    if (tokens.refresh_token) {
+      this.refresh = tokens.refresh_token;
+      SecureStore.setItem(REFRESH_KEY, tokens.refresh_token);
+    }
     SecureStore.deleteItemAsync(LEGACY_REFRESH_KEY).catch(() => undefined);
     SecureStore.deleteItemAsync(LEGACY_ACCESS_KEY).catch(() => undefined);
   }

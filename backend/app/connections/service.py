@@ -7,11 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections.models import Account, BankConnection, Transaction
 from app.connections.provider import BankProvider, ProviderSnapshot
-from app.core.security import decrypt_secret, encrypt_secret
+from app.core.security import decrypt_field, decrypt_secret, encrypt_field, encrypt_secret
 from app.enrichment.service import enrich_transactions
 from app.households.models import HouseholdMember
 
 MAX_MASKED_DIGITS = 4
+
+
+def transaction_plaintext_description(txn: Transaction) -> str:
+    return decrypt_field(txn.raw_description) or ""
+
+
+def account_plaintext_notes(account: Account) -> str | None:
+    return decrypt_field(account.notes)
 
 
 def sanitize_masked_number(value: str | None) -> str | None:
@@ -44,6 +52,19 @@ async def user_in_household(
         select(HouseholdMember.id).where(
             HouseholdMember.household_id == household_id,
             HouseholdMember.user_id == user_id,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def user_is_household_owner(
+    db: AsyncSession, user_id: uuid.UUID, household_id: uuid.UUID
+) -> bool:
+    result = await db.execute(
+        select(HouseholdMember.id).where(
+            HouseholdMember.household_id == household_id,
+            HouseholdMember.user_id == user_id,
+            HouseholdMember.role == "owner",
         )
     )
     return result.scalar_one_or_none() is not None
@@ -131,7 +152,7 @@ async def _apply_snapshot(
                 account_id=account.id,
                 external_id=txn.external_id,
                 date=txn.date,
-                raw_description=txn.description,
+                raw_description=encrypt_field(txn.description) or "",
                 amount=txn.amount,
                 currency=txn.currency,
                 balance_after=txn.balance,
@@ -239,8 +260,6 @@ async def list_transactions(
     min_amount: Decimal | None = None,
     max_amount: Decimal | None = None,
 ) -> tuple[list[Transaction], int]:
-    from app.enrichment.models import TransactionEnrichment
-
     base = (
         select(Transaction)
         .join(Account, Account.id == Transaction.account_id)
@@ -258,12 +277,28 @@ async def list_transactions(
     if max_amount is not None:
         base = base.where(Transaction.amount <= max_amount)
     if q:
+        # Search merchant/category names — raw_description is encrypted at rest.
+        from app.enrichment.models import Category, Merchant, TransactionEnrichment
+
         like = f"%{q.strip()}%"
-        base = base.where(Transaction.raw_description.ilike(like))
-    if needs_review is not None or category_id is not None:
-        base = base.outerjoin(
-            TransactionEnrichment, TransactionEnrichment.transaction_id == Transaction.id
+        base = (
+            base.outerjoin(
+                TransactionEnrichment, TransactionEnrichment.transaction_id == Transaction.id
+            )
+            .outerjoin(Merchant, Merchant.id == TransactionEnrichment.merchant_id)
+            .outerjoin(Category, Category.id == TransactionEnrichment.category_id)
+            .where(
+                (Merchant.name.ilike(like))
+                | (Category.name.ilike(like))
+            )
         )
+    if needs_review is not None or category_id is not None:
+        from app.enrichment.models import TransactionEnrichment
+
+        if q is None:
+            base = base.outerjoin(
+                TransactionEnrichment, TransactionEnrichment.transaction_id == Transaction.id
+            )
         if needs_review is not None:
             base = base.where(TransactionEnrichment.needs_review.is_(needs_review))
         if category_id is not None:
@@ -302,7 +337,7 @@ async def update_account(
     if nickname is not None:
         account.nickname = nickname.strip() or None
     if notes is not None:
-        account.notes = notes.strip() or None
+        account.notes = encrypt_field(notes.strip() or None)
     if hidden is not None:
         account.hidden = hidden
     await db.commit()
@@ -320,7 +355,7 @@ def account_to_response(account: Account, institution_name: str | None = None) -
         "balance": account.balance,
         "masked_number": account.masked_number,
         "nickname": account.nickname,
-        "notes": account.notes,
+        "notes": account_plaintext_notes(account),
         "hidden": account.hidden,
         "display_name": account.nickname or account.name,
         "institution_name": institution_name,

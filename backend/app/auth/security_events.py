@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import uuid
 from typing import Any
 
@@ -9,6 +11,8 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import SecurityEvent
+
+_logger = logging.getLogger("woney.security")
 
 # Keys that must never appear in meta (defense in depth).
 _SECRET_KEYS = frozenset(
@@ -89,4 +93,16 @@ async def record_security_event(
         await db.commit()
     else:
         await db.flush()
+    _logger.info(
+        json.dumps(
+            {
+                "event": "security_event",
+                "event_type": event.event_type,
+                "user_id": str(user_id) if user_id else None,
+                "ip": event.ip,
+                "meta": event.meta,
+            },
+            default=str,
+        )
+    )
     return event

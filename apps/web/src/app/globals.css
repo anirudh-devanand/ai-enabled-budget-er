@@ -603,7 +603,25 @@ textarea {
 }
 
 .app-chrome-toast {
-  margin-bottom: 16px;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 40;
+}
+
+.security-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent, #c4a35a) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #c4a35a) 40%, transparent);
+  color: var(--fg, #f2f2f2);
+  font-size: 0.92rem;
+}
+
+.security-banner a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .hero-balance,

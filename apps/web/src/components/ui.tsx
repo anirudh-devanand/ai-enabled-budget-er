@@ -35,6 +35,22 @@ export function AppShell({
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .me()
+      .then((u) => {
+        if (!cancelled) setMfaEnabled(u.mfa_enabled);
+      })
+      .catch(() => {
+        if (!cancelled) setMfaEnabled(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     // Preserve in-flight login sync so we refresh when it finishes.
@@ -56,6 +72,11 @@ export function AppShell({
 
   async function handleRefresh() {
     setToast(null);
+    if (mfaEnabled === false) {
+      setToast("Enable 2FA on Account before syncing banks");
+      setTimeout(() => setToast(null), 3200);
+      return;
+    }
     try {
       const result = await syncMyBanks({ force: true });
       if (result.failed > 0) {
@@ -65,8 +86,13 @@ export function AppShell({
       } else if (!result.deduped) {
         setToast("Accounts refreshed");
       }
-    } catch {
-      setToast("Could not sync banks");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "";
+      if (/mfa_required/i.test(detail)) {
+        setToast("Enable 2FA on Account before syncing banks");
+      } else {
+        setToast("Could not sync banks");
+      }
     } finally {
       setTimeout(() => setToast(null), 2800);
     }
@@ -109,6 +135,12 @@ export function AppShell({
             <RefreshIcon />
           </button>
         </div>
+        {mfaEnabled === false && (
+          <div className="security-banner" role="status">
+            Turn on two-factor authentication before linking banks.{" "}
+            <Link href="/account">Account → Security</Link>
+          </div>
+        )}
         {toast && <div className="toast app-chrome-toast">{toast}</div>}
         {children}
       </div>

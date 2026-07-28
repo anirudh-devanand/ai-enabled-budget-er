@@ -160,7 +160,10 @@ async def enrich_transactions(
     for txn in transactions:
         if txn.id in existing_ids:
             continue
-        normalized = normalize_descriptor(txn.raw_description)
+        from app.core.security import decrypt_field
+
+        plain_description = decrypt_field(txn.raw_description) or ""
+        normalized = normalize_descriptor(plain_description)
 
         user_rule = user_rules.get(normalized)
         if user_rule is not None:
@@ -211,7 +214,7 @@ async def enrich_transactions(
 
         proposal = await propose_merchant_category(
             llm,
-            txn.raw_description,
+            plain_description,
             str(txn.amount),
             list(categories.keys()),
         )
@@ -254,7 +257,9 @@ async def correct_transaction(
 ) -> tuple[TransactionEnrichment, int]:
     merchant = await get_or_create_merchant(db, merchant_name) if merchant_name else None
     merchant_id = merchant.id if merchant else None
-    normalized = normalize_descriptor(transaction.raw_description)
+    from app.core.security import decrypt_field
+
+    normalized = normalize_descriptor(decrypt_field(transaction.raw_description) or "")
 
     enrichment = (
         await db.execute(
@@ -310,11 +315,13 @@ async def _reapply_rule(
         .join(BankConnection, BankConnection.id == Account.connection_id)
         .where(BankConnection.household_id == household_id)
     )
+    from app.core.security import decrypt_field
+
     matching = [
         t
         for t in result.scalars()
         if t.id != corrected_transaction_id
-        and normalize_descriptor(t.raw_description) == normalized
+        and normalize_descriptor(decrypt_field(t.raw_description) or "") == normalized
     ]
     if not matching:
         return 0

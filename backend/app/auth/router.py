@@ -5,7 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import service
-from app.auth.cookies import clear_refresh_cookie, read_refresh_token, set_refresh_cookie
+from app.auth.cookies import (
+    clear_refresh_cookie,
+    public_token_pair,
+    read_refresh_token,
+    set_refresh_cookie,
+)
 from app.auth.schemas import (
     LoginRequest,
     LogoutRequest,
@@ -52,7 +57,7 @@ async def _issue_and_set_cookie(
 ) -> TokenPair:
     pair = await service.issue_token_pair(db, user_id, request.headers.get("user-agent"))
     set_refresh_cookie(response, pair.refresh_token, request)
-    return pair
+    return TokenPair(**public_token_pair(request, pair.access_token, pair.refresh_token))
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -151,9 +156,12 @@ async def refresh(
     pair = await service.rotate_refresh_token(db, token, request.headers.get("user-agent"))
     if pair is None:
         clear_refresh_cookie(response, request)
+        await record_security_event(
+            db, event_type="refresh_failed", request=request, meta={"reason": "invalid"}, commit=True
+        )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token")
     set_refresh_cookie(response, pair.refresh_token, request)
-    return pair
+    return TokenPair(**public_token_pair(request, pair.access_token, pair.refresh_token))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -231,7 +231,7 @@ async def test_live_bank_link_requires_mfa(client, register_payload):
         headers=headers,
     )
     assert resp.status_code == 403
-    assert "multi-factor" in resp.json()["detail"].lower()
+    assert resp.json()["detail"] == "mfa_required"
 
     resp = await client.post(
         "/v1/connections/",
@@ -239,11 +239,13 @@ async def test_live_bank_link_requires_mfa(client, register_payload):
         headers=headers,
     )
     assert resp.status_code == 403
+    assert resp.json()["detail"] == "mfa_required"
 
-    # Demo seed remains available without MFA.
+    # Demo seed also requires MFA (bank-grade gate).
     resp = await client.post(
         "/v1/connections/",
         json={"household_id": household_id, "login_id": "demo-seed:scotia:30"},
         headers=headers,
     )
-    assert resp.status_code == 201, resp.text
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "mfa_required"

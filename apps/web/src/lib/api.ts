@@ -42,7 +42,7 @@ class BrowserTokenStorage implements TokenStorage {
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export const api = new WoneyClient(baseUrl, new BrowserTokenStorage());
+export const api = new WoneyClient(baseUrl, new BrowserTokenStorage(), { cookieSession: true });
 
 export function hasSession(): boolean {
   if (typeof window === "undefined") return false;

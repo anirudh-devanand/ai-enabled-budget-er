@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -42,7 +42,8 @@ class Account(Base):
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     masked_number: Mapped[str | None] = mapped_column(String(8), default=None)
     nickname: Mapped[str | None] = mapped_column(String(120), default=None)
-    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    # Fernet ciphertext (enc:v1:...) — Text for room after encryption.
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -60,9 +61,8 @@ class Transaction(Base):
     )
     external_id: Mapped[str] = mapped_column(String(64))
     date: Mapped[date] = mapped_column(Date, index=True)
-    # Untouched aggregator descriptor; the enrichment pipeline (next slice)
-    # resolves it to a merchant + category. Never shown raw in the UI.
-    raw_description: Mapped[str] = mapped_column(String(500))
+    # Bank descriptor encrypted at rest (enc:v1:...); decrypt before enrichment/UI.
+    raw_description: Mapped[str] = mapped_column(Text)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     currency: Mapped[str] = mapped_column(String(3), default="CAD")
     balance_after: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=None)

@@ -105,3 +105,32 @@ def encrypt_secret(value: str) -> str:
 
 def decrypt_secret(value: str) -> str:
     return _fernet().decrypt(value.encode()).decode()
+
+
+# Field-level encryption for free-text columns (descriptors, notes).
+# Prefix lets decrypt pass through legacy plaintext rows.
+_FIELD_PREFIX = "enc:v1:"
+
+
+def encrypt_field(value: str | None) -> str | None:
+    """Encrypt a free-text field for at-rest storage. None/empty stay None."""
+    if value is None:
+        return None
+    text = value.strip() if isinstance(value, str) else str(value)
+    if not text:
+        return None
+    if text.startswith(_FIELD_PREFIX):
+        return text
+    return _FIELD_PREFIX + encrypt_secret(text)
+
+
+def decrypt_field(value: str | None) -> str | None:
+    """Decrypt an encrypt_field value; plaintext (legacy) returned as-is."""
+    if value is None:
+        return None
+    if not value.startswith(_FIELD_PREFIX):
+        return value
+    try:
+        return decrypt_secret(value[len(_FIELD_PREFIX) :])
+    except Exception:
+        return value

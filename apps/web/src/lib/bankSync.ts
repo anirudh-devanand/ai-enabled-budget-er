@@ -81,6 +81,17 @@ export async function syncMyBanks(options?: {
       return result;
     } catch (err) {
       const message = getApiDetail(err) || "Bank sync failed";
+      // MFA not enabled yet — not an error for login kickoff / soft refresh.
+      if (message === "mfa_required" || /mfa_required/i.test(message)) {
+        const empty: BankSyncResult = {
+          synced: 0,
+          failed: 0,
+          skipped: 0,
+          deduped: false,
+        };
+        emit({ syncing: false, error: null, result: empty });
+        return empty;
+      }
       emit({ syncing: false, error: message, result: null });
       throw err;
     } finally {

@@ -15,6 +15,7 @@ from app.account.email import email_configured, send_password_reset_link
 from app.auth.models import PasswordResetToken
 from app.auth.oauth import origin_from_request
 from app.auth.schemas import PasswordResetConfirmRequest, PasswordResetRequestResponse
+from app.auth.security_events import record_security_event
 from app.auth.service import revoke_all_sessions
 from app.core.config import get_settings
 from app.core.security import assert_password_strength, hash_password, hash_refresh_token
@@ -68,6 +69,13 @@ async def request_password_reset(
 
     # Unknown email / OAuth-only accounts: still succeed silently.
     if user is None or not user.password_hash:
+        await record_security_event(
+            db,
+            event_type="password_reset_request",
+            request=request,
+            meta={"outcome": "no_account"},
+            commit=True,
+        )
         return PasswordResetRequestResponse(message=GENERIC_MESSAGE, delivery="none")
 
     if await _recent_request_count(db, user.id) >= REQUEST_MAX_PER_EMAIL:
@@ -95,6 +103,15 @@ async def request_password_reset(
         )
     )
     await db.commit()
+
+    await record_security_event(
+        db,
+        event_type="password_reset_request",
+        user_id=user.id,
+        request=request,
+        meta={"outcome": "token_created"},
+        commit=True,
+    )
 
     base = _public_base_url(request)
     reset_url = f"{base}/reset-password?token={plain}"

@@ -95,7 +95,9 @@ export class MemoryTokenStorage implements TokenStorage {
   }
   setTokens(tokens: TokenPair) {
     this.access = tokens.access_token;
-    this.refresh = tokens.refresh_token;
+    if (tokens.refresh_token) {
+      this.refresh = tokens.refresh_token;
+    }
   }
   clear() {
     this.access = null;
@@ -107,6 +109,8 @@ export class WoneyClient {
   constructor(
     private baseUrl: string,
     private storage: TokenStorage = new MemoryTokenStorage(),
+    /** Web: omit refresh from JSON; send credentials + X-Woney-Session: cookie */
+    private opts: { cookieSession?: boolean } = {},
   ) {}
 
   private async request<T>(
@@ -116,6 +120,9 @@ export class WoneyClient {
     opts: { auth?: boolean; retried?: boolean } = {},
   ): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (this.opts.cookieSession) {
+      headers["X-Woney-Session"] = "cookie";
+    }
     if (opts.auth) {
       const token = this.storage.getAccessToken();
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -350,6 +357,9 @@ export class WoneyClient {
     form.append("file", input.file, input.fileName ?? "statement.csv");
 
     const headers: Record<string, string> = {};
+    if (this.opts.cookieSession) {
+      headers["X-Woney-Session"] = "cookie";
+    }
     const token = this.storage.getAccessToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
 

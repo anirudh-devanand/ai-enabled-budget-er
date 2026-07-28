@@ -11,6 +11,30 @@ from fastapi import Request, Response
 from app.core.config import get_settings
 
 REFRESH_COOKIE_NAME = "woney_refresh"
+# Web clients send this so JSON responses omit refresh (cookie-only).
+COOKIE_SESSION_HEADER = "x-woney-session"
+COOKIE_SESSION_VALUE = "cookie"
+
+
+def wants_cookie_session(request: Request | None) -> bool:
+    if request is None:
+        return False
+    return (request.headers.get(COOKIE_SESSION_HEADER) or "").strip().lower() == COOKIE_SESSION_VALUE
+
+
+def public_token_pair(request: Request | None, access_token: str, refresh_token: str) -> dict[str, str]:
+    """JSON body for TokenPair. Cookie-session clients get empty refresh_token."""
+    if wants_cookie_session(request):
+        return {
+            "access_token": access_token,
+            "refresh_token": "",
+            "token_type": "bearer",
+        }
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 
 def _cookie_flags(request: Request | None = None) -> tuple[bool, str]:

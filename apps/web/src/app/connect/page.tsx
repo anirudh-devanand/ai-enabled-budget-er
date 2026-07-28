@@ -254,8 +254,18 @@ function ConnectInner() {
             <h2>Import a statement</h2>
             <p className="sub">
               Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are detected
-              automatically from common Canadian export formats. MFA is not required for CSV import.
+              automatically from common Canadian export formats. Two-factor authentication is required.
             </p>
+            {mfaEnabled === false ? (
+              <div>
+                <p className="error" style={{ marginTop: 0 }}>
+                  Enable multi-factor authentication before importing statements.
+                </p>
+                <Link href="/account" className="btn btn-primary">
+                  Open Account security
+                </Link>
+              </div>
+            ) : (
             <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
               <label>
                 Institution
@@ -286,6 +296,7 @@ function ConnectInner() {
                 Import statement
               </button>
             </form>
+            )}
           </section>
         )}
 
@@ -293,11 +304,23 @@ function ConnectInner() {
           <section className="card connect-card">
             <h2>Demo Scotiabank history</h2>
             <p className="sub">
-              Seeds synthetic CAD accounts and ~180 days of transactions for QA — no Plaid keys required.
+              Seeds synthetic CAD accounts and ~180 days of transactions for QA. Two-factor
+              authentication is required.
             </p>
-            <button type="button" className="btn btn-primary" disabled={status === "syncing"} onClick={onDemo}>
-              Load demo data
-            </button>
+            {mfaEnabled === false ? (
+              <div>
+                <p className="error" style={{ marginTop: 0 }}>
+                  Enable multi-factor authentication before loading demo data.
+                </p>
+                <Link href="/account" className="btn btn-primary">
+                  Open Account security
+                </Link>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-primary" disabled={status === "syncing"} onClick={onDemo}>
+                Load demo data
+              </button>
+            )}
           </section>
         )}
       </div>
