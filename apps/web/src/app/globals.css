@@ -221,6 +221,52 @@ textarea {
   outline: none;
 }
 
+.otp-input {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.otp-digit {
+  width: 100%;
+  min-width: 0;
+  max-width: 52px;
+  aspect-ratio: 1;
+  text-align: center;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 0;
+  border-radius: 12px;
+  background: #f6f6f4;
+  color: #141414 !important;
+  -webkit-text-fill-color: #141414;
+  border: 1px solid #e6e6e1;
+  box-shadow: none;
+  outline: none;
+}
+
+.otp-digit:focus {
+  border-color: #c9a84a;
+  box-shadow: 0 0 0 3px rgba(201, 168, 74, 0.18);
+}
+
+.otp-digit:disabled {
+  opacity: 0.65;
+}
+
+@media (max-width: 420px) {
+  .otp-input {
+    gap: 6px;
+  }
+
+  .otp-digit {
+    font-size: 1.15rem;
+    border-radius: 10px;
+  }
+}
+
 .auth-card .field input:focus,
 .auth-card input:focus {
   border-color: #d2d2cb;

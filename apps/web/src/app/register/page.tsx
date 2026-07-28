@@ -10,6 +10,7 @@ import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
+import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 import { passwordScore } from "@/lib/ui";
 
 export default function RegisterPage() {
@@ -48,9 +49,8 @@ export default function RegisterPage() {
       await api.register(email, password, displayName);
       const result = await api.login(email, password);
       if (isMfaChallenge(result)) {
-        const { storeMfaChallenge } = await import("@/lib/mfaChallenge");
         storeMfaChallenge(result);
-        router.replace("/login?mfa=1");
+        router.replace(mfaChallengeHref(result));
         return;
       }
       kickoffBankSync();

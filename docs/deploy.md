@@ -18,12 +18,80 @@ Env prefix is **`WONEY_`**. Legacy **`LEDGER_*`** names still work until you mig
    - `WONEY_CORS_ORIGINS` — your Vercel URL(s), e.g. `https://woneyai.vercel.app,https://woney-web-blue.vercel.app,https://ledger-web-blue.vercel.app`
    - `WONEY_OAUTH_REDIRECT_URI` — `https://woneyai.vercel.app/login/oauth/callback` (also add this URI in Google Cloud Console)
    - `WONEY_PUBLIC_APP_URL` — `https://woneyai.vercel.app` (password-reset email links)
-   - `WONEY_RESEND_API_KEY` + `WONEY_EMAIL_FROM` — optional; needed for real password-reset / deletion emails
+   - `WONEY_RESEND_API_KEY` + `WONEY_EMAIL_FROM` — optional; needed for real password-reset / deletion / **login MFA email OTP** emails (see §1c)
 5. Render generates `WONEY_JWT_SECRET` and `WONEY_OPS_TOKEN`. Existing service env vars
    (including legacy `LEDGER_*`) keep working even if Blueprint briefly shows unmanaged.
 6. **Important:** Render Postgres connection strings use `postgres://`; the Docker entrypoint
    rewrites to `postgresql+asyncpg://...` for `WONEY_DATABASE_URL` (and legacy `LEDGER_DATABASE_URL`).
 7. Confirm `https://<api-host>/healthz` returns `{"status":"ok","database":"up"}`.
+
+## 1c. Alembic `0013` + Resend (login MFA email)
+
+Migration `0013_mfa_login_challenges` creates the `mfa_login_challenges` table used for
+email OTP on sign-in. The API Docker entrypoint already runs `alembic upgrade head` on
+**every** container start (`backend/docker-entrypoint.sh`), so a normal deploy of a build
+that includes revision `0013` applies it automatically.
+
+### Apply migration `0013` on Render
+
+**Preferred (automatic):**
+
+1. Merge/push the commit that adds `backend/alembic/versions/0013_mfa_login_challenges.py`.
+2. [Render Dashboard](https://dashboard.render.com) → service **`woney-api`** (or your API name) → **Manual Deploy** → **Deploy latest commit**.
+3. Watch deploy logs for `alembic upgrade head` succeeding (no `Can't locate revision` / DB errors).
+4. Optional check — Render Shell (or local against prod URL only for health): after boot, login MFA should stop failing with missing-table errors.
+
+**Manual (only if you need to run Alembic without a full redeploy):**
+
+1. Dashboard → **`woney-api`** → **Shell**.
+2. From the app working directory (usually `/app` in the image):
+
+```bash
+alembic upgrade head
+# or specifically:
+# alembic upgrade 0013_mfa_login_challenges
+alembic current
+```
+
+Expect `current` to show `0013_mfa_login_challenges` (or a later head).
+
+**Local (dev Postgres):**
+
+```bash
+cd backend
+alembic upgrade head
+# or: alembic upgrade 0013_mfa_login_challenges
+```
+
+### Set Resend env vars on Render
+
+Without both vars, `/healthz` reports `"email_configured": false` and production login MFA
+cannot send real email OTPs (dev may expose `dev_code` when Resend is unset).
+
+| Variable | Example | Notes |
+|---|---|---|
+| `WONEY_RESEND_API_KEY` | `re_...` | From [Resend](https://resend.com) → API Keys |
+| `WONEY_EMAIL_FROM` | `Woney <noreply@yourdomain.com>` | Must be a verified domain/sender in Resend |
+
+Legacy aliases still work if `WONEY_*` is unset: `LEDGER_RESEND_API_KEY`, `LEDGER_EMAIL_FROM`.
+
+**Clicks:**
+
+1. Resend dashboard → create API key → verify sending domain → note From address.
+2. Render → **`woney-api`** → **Environment** → **Add Environment Variable** (or edit):
+   - Key `WONEY_RESEND_API_KEY` → paste key (mark secret).
+   - Key `WONEY_EMAIL_FROM` → e.g. `Woney <noreply@yourdomain.com>`.
+3. **Save Changes**.
+4. **Manual Deploy** (or restart) so the running process reloads env — env edits alone do not always restart free-tier services.
+5. Verify:
+
+```bash
+curl -s https://<api-host>/healthz
+# expect "email_configured": true
+```
+
+Also used for: password-reset links, account-deletion OTPs, and login MFA codes
+(`send_login_mfa_code` in `backend/app/account/email.py`).
 
 ### Alternative: Fly.io
 
@@ -107,8 +175,8 @@ Set `EXPO_PUBLIC_API_URL` in EAS secrets / `eas.json` env for production profile
 
 ## Checklist
 
-- [ ] `/healthz` OK on public API
-- [ ] Web login works (CORS)
+- [ ] `/healthz` OK on public API (`email_configured: true` if using Resend / login MFA email)
+- [ ] Web login works (CORS); MFA lands on `/login/mfa`
 - [ ] Mobile Expo Go reaches API over HTTPS
 - [ ] Secrets are not the repo defaults
 - [ ] Ops token only known to cron
