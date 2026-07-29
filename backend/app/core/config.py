@@ -149,6 +149,7 @@ class Settings(BaseSettings):
             "https://woneyai.vercel.app",
             "https://woney-web-blue.vercel.app",
             "https://ledger-web-blue.vercel.app",
+            "https://www.woneyai.vercel.app",
         ]
         return list(dict.fromkeys([*configured, *known]))
 

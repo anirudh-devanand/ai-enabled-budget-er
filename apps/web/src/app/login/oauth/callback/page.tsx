@@ -11,11 +11,8 @@ import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 
-function loginErrorHref(message: string): string {
-  const q = new URLSearchParams();
-  q.set("error", message);
-  return `/login?${q.toString()}`;
-}
+const OAUTH_CODE_KEY = "woney.oauth_code_used";
+const OAUTH_REDIRECT_KEY = "woney.oauth_redirect_uri";
 
 function oauthProviderErrorMessage(error: string, description: string | null): string {
   const desc = description?.trim();
@@ -30,6 +27,40 @@ function oauthProviderErrorMessage(error: string, description: string | null): s
   }
 }
 
+function readStoredRedirectUri(): string | null {
+  try {
+    return sessionStorage.getItem(OAUTH_REDIRECT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function codeAlreadyUsed(code: string): boolean {
+  try {
+    return sessionStorage.getItem(OAUTH_CODE_KEY) === code;
+  } catch {
+    return false;
+  }
+}
+
+function markCodeUsed(code: string) {
+  try {
+    sessionStorage.setItem(OAUTH_CODE_KEY, code);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearOAuthHandoff() {
+  try {
+    sessionStorage.removeItem(OAUTH_CODE_KEY);
+    sessionStorage.removeItem(OAUTH_REDIRECT_KEY);
+  } catch {
+    /* ignore */
+  }
+  clearOAuthIntent();
+}
+
 /** Survives Strict Mode remounts so the one-time auth code is not exchanged twice. */
 let oauthCodeInFlight: string | null = null;
 
@@ -42,43 +73,57 @@ function OAuthCallbackInner() {
     const oauthError = params.get("error");
     if (oauthError) {
       const message = oauthProviderErrorMessage(oauthError, params.get("error_description"));
-      router.replace(loginErrorHref(message));
+      setError(message);
       return;
     }
 
     const code = params.get("code");
     if (!code) {
-      const message = "Missing authorization code from Google.";
-      setError(message);
-      router.replace(loginErrorHref(message));
+      setError("Missing authorization code from Google.");
       return;
     }
 
     if (oauthCodeInFlight === code) return;
+    if (codeAlreadyUsed(code)) {
+      setError("This Google sign-in was already used. Go back and try Continue with Google again.");
+      return;
+    }
     oauthCodeInFlight = code;
+    markCodeUsed(code);
 
     const provider = readOAuthProvider(params.get("state"));
-    const redirectUri = `${window.location.origin}/login/oauth/callback`;
+    const state = params.get("state");
+    const redirectUri =
+      readStoredRedirectUri() || `${window.location.origin}/login/oauth/callback`;
     const intent = readOAuthIntent();
 
     (async () => {
       try {
-        const result = await api.loginWithOAuthCode(provider, code, redirectUri, intent);
-        clearOAuthIntent();
+        const result = await api.loginWithOAuthCode(
+          provider,
+          code,
+          redirectUri,
+          intent,
+          state,
+        );
+        clearOAuthHandoff();
         if (isMfaChallenge(result)) {
           storeMfaChallenge(result);
-          // Pass short-lived challenge JWT in the URL so MFA survives sessionStorage loss.
-          router.replace(mfaChallengeHref(result));
+          // Hard navigation keeps challenge query intact across remounts.
+          window.location.assign(mfaChallengeHref(result));
           return;
         }
         kickoffBankSync();
-        router.replace("/dashboard");
+        window.location.assign("/dashboard");
       } catch (err) {
         oauthCodeInFlight = null;
+        try {
+          sessionStorage.removeItem(OAUTH_CODE_KEY);
+        } catch {
+          /* ignore */
+        }
         clearOAuthIntent();
-        const message = authErrorMessage(err, "Sign-in failed");
-        setError(message);
-        router.replace(loginErrorHref(message));
+        setError(authErrorMessage(err, "Sign-in failed"));
       }
     })();
   }, [params, router]);

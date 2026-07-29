@@ -306,6 +306,7 @@ export class WoneyClient {
     code: string,
     redirectUri?: string,
     intent?: "login" | "signup",
+    state?: string | null,
   ) {
     const result = await this.request<LoginResponse>(
       "POST",
@@ -314,6 +315,7 @@ export class WoneyClient {
         code,
         redirect_uri: redirectUri,
         ...(intent ? { intent } : {}),
+        ...(state ? { state } : {}),
       },
     );
     if ("access_token" in result) this.storage.setTokens(result);

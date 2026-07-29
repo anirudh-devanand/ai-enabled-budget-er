@@ -4,6 +4,7 @@ import type { OAuthProvider } from "@woney/api-client";
 
 const PROVIDER_KEY = "woney_oauth_provider";
 const INTENT_KEY = "woney_oauth_intent";
+const REDIRECT_KEY = "woney.oauth_redirect_uri";
 
 export type OAuthIntent = "login" | "signup";
 
@@ -12,6 +13,15 @@ function storeOAuthIntent(intent: OAuthIntent) {
     sessionStorage.setItem(INTENT_KEY, intent);
   } catch {
     /* private mode */
+  }
+}
+
+function storeOAuthRedirectFromAuthUrl(authUrl: string) {
+  try {
+    const redirect = new URL(authUrl).searchParams.get("redirect_uri");
+    if (redirect) sessionStorage.setItem(REDIRECT_KEY, redirect);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -137,6 +147,7 @@ export function SsoButtons({ providers, intent = "login", loading = false }: Pro
                   /* private mode */
                 }
                 storeOAuthIntent(intent);
+                storeOAuthRedirectFromAuthUrl(p.auth_url);
                 window.location.href = p.auth_url;
               }}
             >

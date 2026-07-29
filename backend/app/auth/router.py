@@ -387,9 +387,17 @@ async def oauth_provider_callback(
     if not code or not isinstance(code, str):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing code")
     settings = get_settings()
-    from app.auth.oauth import is_allowed_oauth_redirect, resolve_oauth_redirect_uri
+    from app.auth.oauth import (
+        is_allowed_oauth_redirect,
+        redirect_uri_from_state,
+        resolve_oauth_redirect_uri,
+    )
 
-    redirect_uri = body.get("redirect_uri") or resolve_oauth_redirect_uri(settings, request)
+    # Prefer redirect_uri embedded in OAuth state (exact match with authorize request).
+    state = body.get("state") if isinstance(body.get("state"), str) else None
+    redirect_uri = redirect_uri_from_state(state)
+    if not redirect_uri:
+        redirect_uri = body.get("redirect_uri") or resolve_oauth_redirect_uri(settings, request)
     if not isinstance(redirect_uri, str) or not is_allowed_oauth_redirect(settings, redirect_uri):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid redirect_uri")
     try:

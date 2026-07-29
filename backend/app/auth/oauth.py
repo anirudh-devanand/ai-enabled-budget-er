@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import secrets
 import time
 from dataclasses import dataclass
@@ -58,8 +59,31 @@ class OAuthProviderInfo:
     auth_url: str | None = None
 
 
-def _state(provider: str) -> str:
-    return f"{provider}:{secrets.token_urlsafe(16)}"
+def _b64url(raw: str) -> str:
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(raw: str) -> str | None:
+    try:
+        pad = "=" * (-len(raw) % 4)
+        return base64.urlsafe_b64decode(raw + pad).decode("utf-8")
+    except Exception:
+        return None
+
+
+def _state(provider: str, redirect_uri: str) -> str:
+    """provider:nonce:b64(redirect_uri) — redirect must match token exchange exactly."""
+    return f"{provider}:{secrets.token_urlsafe(16)}:{_b64url(redirect_uri)}"
+
+
+def redirect_uri_from_state(state: str | None) -> str | None:
+    """Extract the authorize redirect_uri embedded in OAuth state."""
+    if not state or ":" not in state:
+        return None
+    parts = state.split(":", 2)
+    if len(parts) < 3:
+        return None
+    return _b64url_decode(parts[2])
 
 
 def configured_providers(settings: Settings, redirect_uri: str) -> list[OAuthProviderInfo]:
@@ -76,7 +100,7 @@ def configured_providers(settings: Settings, redirect_uri: str) -> list[OAuthPro
                 "scope": "openid email profile",
                 "access_type": "online",
                 "prompt": "select_account",
-                "state": _state("google"),
+                "state": _state("google", redirect_uri),
             }
         )
         google_url = f"https://accounts.google.com/o/oauth2/v2/auth?{params}"
@@ -94,7 +118,7 @@ def configured_providers(settings: Settings, redirect_uri: str) -> list[OAuthPro
                 "response_type": "code",
                 "response_mode": "query",
                 "scope": "name email",
-                "state": _state("apple"),
+                "state": _state("apple", redirect_uri),
             }
         )
         apple_url = f"https://appleid.apple.com/auth/authorize?{params}"
@@ -112,7 +136,7 @@ def configured_providers(settings: Settings, redirect_uri: str) -> list[OAuthPro
                 "response_type": "code",
                 "response_mode": "query",
                 "scope": "openid email profile User.Read",
-                "state": _state("microsoft"),
+                "state": _state("microsoft", redirect_uri),
             }
         )
         ms_url = f"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?{params}"
@@ -120,6 +144,25 @@ def configured_providers(settings: Settings, redirect_uri: str) -> list[OAuthPro
         OAuthProviderInfo(id="microsoft", name="Microsoft", enabled=ms_enabled, auth_url=ms_url)
     )
     return providers
+
+
+def _oauth_http_error_message(provider: str, resp: httpx.Response) -> str:
+    """Prefer provider error_description over opaque HTTP status text."""
+    detail = ""
+    try:
+        payload = resp.json()
+        if isinstance(payload, dict):
+            detail = str(
+                payload.get("error_description")
+                or payload.get("error")
+                or payload.get("message")
+                or ""
+            ).strip()
+    except Exception:
+        detail = (resp.text or "").strip()[:240]
+    if detail:
+        return f"{provider} OAuth failed ({resp.status_code}): {detail}"
+    return f"{provider} OAuth failed ({resp.status_code})"
 
 
 async def exchange_google_code(settings: Settings, code: str, redirect_uri: str) -> dict[str, Any]:
@@ -136,13 +179,15 @@ async def exchange_google_code(settings: Settings, code: str, redirect_uri: str)
                 "grant_type": "authorization_code",
             },
         )
-        token_resp.raise_for_status()
+        if token_resp.status_code >= 400:
+            raise RuntimeError(_oauth_http_error_message("Google", token_resp))
         tokens = token_resp.json()
         user_resp = await client.get(
             "https://openidconnect.googleapis.com/v1/userinfo",
             headers={"Authorization": f"Bearer {tokens['access_token']}"},
         )
-        user_resp.raise_for_status()
+        if user_resp.status_code >= 400:
+            raise RuntimeError(_oauth_http_error_message("Google userinfo", user_resp))
         return user_resp.json()
 
 
@@ -183,7 +228,8 @@ async def exchange_apple_code(settings: Settings, code: str, redirect_uri: str) 
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        token_resp.raise_for_status()
+        if token_resp.status_code >= 400:
+            raise RuntimeError(_oauth_http_error_message("Apple", token_resp))
         tokens = token_resp.json()
 
     id_token = tokens.get("id_token")
@@ -220,7 +266,8 @@ async def exchange_microsoft_code(settings: Settings, code: str, redirect_uri: s
                 "grant_type": "authorization_code",
             },
         )
-        token_resp.raise_for_status()
+        if token_resp.status_code >= 400:
+            raise RuntimeError(_oauth_http_error_message("Microsoft", token_resp))
         tokens = token_resp.json()
         access = tokens.get("access_token")
         if not access:

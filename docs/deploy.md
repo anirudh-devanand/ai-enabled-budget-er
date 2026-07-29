@@ -136,6 +136,8 @@ curl -s https://ledger-api-ayer.onrender.com/healthz
 1. Import the monorepo in Vercel; root directory = repo root (uses `vercel.json`).
 2. Environment variables:
    - `NEXT_PUBLIC_API_URL` = `https://<your-api-host>` (no trailing slash) — e.g. `https://ledger-api-ayer.onrender.com`
+   - Confirm with `curl -s https://ledger-api-ayer.onrender.com/healthz` (must return JSON, not `Not Found`)
+   - Do **not** point Vercel at `woney-api-ayer.onrender.com` unless that hostname answers `/healthz`
    - Do **not** put Plaid client id/secret here; they belong on Render (section 1b)
 3. Deploy. Update API `WONEY_CORS_ORIGINS` to the Vercel production URL and redeploy API if needed.
    CSP in `apps/web/next.config.ts` must allow `https://cdn.plaid.com` in `script-src`

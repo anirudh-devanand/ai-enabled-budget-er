@@ -69,7 +69,21 @@ export function authErrorMessage(err: unknown, fallback = "Something went wrong"
     return detail || "Too many attempts. Try again in a few minutes.";
   }
 
-  if (status === 502 || status === 503) {
+  if (
+    status === 502 ||
+    status === 503 ||
+    lower.includes("redirect_uri") ||
+    lower.includes("invalid_grant")
+  ) {
+    if (lower.includes("redirect_uri")) {
+      return (
+        detail ||
+        "Google rejected the redirect URI. Confirm the callback URL is listed in Google Cloud Console."
+      );
+    }
+    if (lower.includes("invalid_grant")) {
+      return "Google sign-in expired or was reused. Click Continue with Google again.";
+    }
     return detail || "The service is temporarily unavailable. Try again shortly.";
   }
 
