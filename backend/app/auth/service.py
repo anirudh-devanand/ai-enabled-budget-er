@@ -73,22 +73,15 @@ async def issue_login_mfa_challenge(
     elif totp_ok:
         primary = "totp"
         message = "Enter the code from your authenticator app (or a recovery code)."
-    elif settings.env != "production":
-        primary = "inline"
-        message = "Email is not configured — use the one-time code shown below."
-        dev_code = plain
     else:
-        # Production without Resend and without authenticator — still issue challenge;
-        # user must have enrolled authenticator or configure email.
-        if totp_ok:
-            primary = "totp"
-            message = "Enter the code from your authenticator app."
-        else:
-            primary = "email"
-            message = (
-                "Sign-in email could not be sent. Add an authenticator in Account → Security, "
-                "or contact support."
-            )
+        # Email infra missing (common before Resend is wired). Show a one-time
+        # code on the MFA page so Google/password login is not a dead end.
+        primary = "inline"
+        message = (
+            "Email delivery is not configured yet — use the one-time code shown below. "
+            "Add Resend (WONEY_RESEND_API_KEY + WONEY_EMAIL_FROM) for email codes."
+        )
+        dev_code = plain
 
     return MfaChallengeResponse(
         challenge_token=create_mfa_challenge_token(user.id),
