@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isMfaChallenge } from "@woney/api-client";
-import { readOAuthProvider } from "@/components/SsoButtons";
+import { AuthBrand } from "@/components/AuthBrand";
+import { clearOAuthIntent, readOAuthIntent, readOAuthProvider } from "@/components/SsoButtons";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
@@ -58,10 +59,12 @@ function OAuthCallbackInner() {
 
     const provider = readOAuthProvider(params.get("state"));
     const redirectUri = `${window.location.origin}/login/oauth/callback`;
+    const intent = readOAuthIntent();
 
     (async () => {
       try {
-        const result = await api.loginWithOAuthCode(provider, code, redirectUri);
+        const result = await api.loginWithOAuthCode(provider, code, redirectUri, intent);
+        clearOAuthIntent();
         if (isMfaChallenge(result)) {
           storeMfaChallenge(result);
           // Pass short-lived challenge JWT in the URL so MFA survives sessionStorage loss.
@@ -72,6 +75,7 @@ function OAuthCallbackInner() {
         router.replace("/dashboard");
       } catch (err) {
         oauthCodeInFlight = null;
+        clearOAuthIntent();
         const message = authErrorMessage(err, "Sign-in failed");
         setError(message);
         router.replace(loginErrorHref(message));
@@ -82,15 +86,25 @@ function OAuthCallbackInner() {
   if (error) {
     return (
       <main className="auth">
-        <section className="auth-panel" style={{ gridColumn: "1 / -1" }}>
-          <div className="auth-card">
-            <h1>Sign-in failed</h1>
-            <p className="sub">{error}</p>
-            <button type="button" className="btn btn-primary btn-block" onClick={() => router.push("/login")}>
-              Back to sign in
-            </button>
-          </div>
-        </section>
+        <div className="auth-shell">
+          <AuthBrand
+            headline="Sign-in paused."
+            lede="Something went wrong finishing Google sign-in. You can go back and try again."
+          />
+          <section className="auth-panel">
+            <div className="auth-card">
+              <h1>Sign-in failed</h1>
+              <p className="sub auth-error-detail">{error}</p>
+              <button
+                type="button"
+                className="btn btn-primary btn-block"
+                onClick={() => router.push("/login")}
+              >
+                Back to sign in
+              </button>
+            </div>
+          </section>
+        </div>
       </main>
     );
   }

@@ -1,0 +1,19 @@
+---
+description: Auto commit and push when finishing user-requested Woney work
+alwaysApply: true
+---
+
+# Auto commit and push
+
+When the user asks for a change in this repo and that work is finished:
+
+1. **Commit and push to `origin` without waiting** for a separate “commit/push” request.
+2. Follow the normal git safety protocol (status, diff, log; no secrets; no force push; no Cursor co-author).
+3. Use a clear commit message focused on why.
+4. After push, briefly tell the user the commit hash / that it’s on the remote.
+
+Do **not** auto-push for:
+
+- Exploratory / unfinished work the user has not asked to ship
+- Changes that still need their decision (secrets, destructive ops, force-push)
+- Pure Q&A with no code changes

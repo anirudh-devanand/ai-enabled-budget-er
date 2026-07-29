@@ -301,13 +301,19 @@ export class WoneyClient {
     return this.loginWithOAuthCode("google", code, redirectUri);
   }
 
-  async loginWithOAuthCode(provider: string, code: string, redirectUri?: string) {
+  async loginWithOAuthCode(
+    provider: string,
+    code: string,
+    redirectUri?: string,
+    intent?: "login" | "signup",
+  ) {
     const result = await this.request<LoginResponse>(
       "POST",
       `/v1/auth/oauth/${provider}/callback`,
       {
         code,
         redirect_uri: redirectUri,
+        ...(intent ? { intent } : {}),
       },
     );
     if ("access_token" in result) this.storage.setTokens(result);

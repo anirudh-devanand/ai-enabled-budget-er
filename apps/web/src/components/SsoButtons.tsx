@@ -3,6 +3,35 @@
 import type { OAuthProvider } from "@woney/api-client";
 
 const PROVIDER_KEY = "woney_oauth_provider";
+const INTENT_KEY = "woney_oauth_intent";
+
+export type OAuthIntent = "login" | "signup";
+
+function storeOAuthIntent(intent: OAuthIntent) {
+  try {
+    sessionStorage.setItem(INTENT_KEY, intent);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function readOAuthIntent(): OAuthIntent {
+  try {
+    const raw = sessionStorage.getItem(INTENT_KEY);
+    if (raw === "signup" || raw === "login") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "login";
+}
+
+export function clearOAuthIntent() {
+  try {
+    sessionStorage.removeItem(INTENT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function GoogleLogo() {
   return (
@@ -61,9 +90,27 @@ function logoFor(id: string) {
 
 type Props = {
   providers: OAuthProvider[];
+  /** signup → existing emails are rejected and sent to login; login → normal SSO. */
+  intent?: OAuthIntent;
+  /** Show an immediate Google placeholder while /oauth/providers loads. */
+  loading?: boolean;
 };
 
-export function SsoButtons({ providers }: Props) {
+export function SsoButtons({ providers, intent = "login", loading = false }: Props) {
+  if (loading && !providers.length) {
+    return (
+      <>
+        <div className="sso-row" aria-busy="true" aria-label="Loading sign-in options">
+          <button type="button" className="sso-btn sso-btn-skeleton" disabled>
+            <span className="sso-icon">{logoFor("google")}</span>
+            <span>Continue with Google</span>
+          </button>
+        </div>
+        <div className="sso-divider">or use email</div>
+      </>
+    );
+  }
+
   if (!providers.length) return null;
 
   return (
@@ -89,6 +136,7 @@ export function SsoButtons({ providers }: Props) {
                 } catch {
                   /* private mode */
                 }
+                storeOAuthIntent(intent);
                 window.location.href = p.auth_url;
               }}
             >

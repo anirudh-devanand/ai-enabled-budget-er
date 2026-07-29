@@ -9,9 +9,15 @@ import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
-import { authErrorMessage } from "@/lib/errors";
+import { authErrorMessage, getApiStatus } from "@/lib/errors";
 import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 import { passwordScore } from "@/lib/ui";
+
+function loginAccountExistsHref(message: string): string {
+  const q = new URLSearchParams();
+  q.set("error", message);
+  return `/login?${q.toString()}`;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,6 +27,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
+  const [ssoLoading, setSsoLoading] = useState(true);
   const [ssoNote, setSsoNote] = useState<string | null>(null);
   const strength = useMemo(() => passwordScore(password), [password]);
 
@@ -34,7 +41,8 @@ export default function RegisterPage() {
       .catch(() => {
         setProviders([]);
         setSsoNote("Sign-in providers unavailable — check your connection and try again.");
-      });
+      })
+      .finally(() => setSsoLoading(false));
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -56,7 +64,12 @@ export default function RegisterPage() {
       kickoffBankSync();
       router.replace("/dashboard");
     } catch (err) {
-      setError(authErrorMessage(err));
+      const message = authErrorMessage(err);
+      if (getApiStatus(err) === 409) {
+        router.replace(loginAccountExistsHref(message));
+        return;
+      }
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -74,8 +87,8 @@ export default function RegisterPage() {
           <div className="auth-card">
             <h1>Create your account</h1>
             <p className="sub">Takes about a minute — or continue with SSO.</p>
-            <SsoButtons providers={providers} />
-            {ssoNote && !providers.length && <p className="muted">{ssoNote}</p>}
+            <SsoButtons providers={providers} intent="signup" loading={ssoLoading} />
+            {ssoNote && !providers.length && !ssoLoading && <p className="muted">{ssoNote}</p>}
             <form onSubmit={submit}>
               <div className="field">
                 <label htmlFor="name">Full name</label>

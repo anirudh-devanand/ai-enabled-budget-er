@@ -321,6 +321,7 @@ async def _oauth_upsert_and_issue(
     email: str,
     subject: str,
     display_name: str,
+    intent: str = "login",
 ):
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -337,6 +338,11 @@ async def _oauth_upsert_and_issue(
         await db.flush()
         await create_personal_household(db, user)
     else:
+        if intent == "signup":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "An account with this email already exists. Sign in instead.",
+            )
         user.oauth_provider = user.oauth_provider or provider
         user.oauth_subject = user.oauth_subject or subject
     await db.commit()
@@ -398,6 +404,11 @@ async def oauth_provider_callback(
     if not email or not subject:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{provider.title()} profile incomplete")
 
+    raw_intent = body.get("intent")
+    intent = raw_intent.strip().lower() if isinstance(raw_intent, str) else "login"
+    if intent not in ("login", "signup"):
+        intent = "login"
+
     return await _oauth_upsert_and_issue(
         db=db,
         request=request,
@@ -406,4 +417,5 @@ async def oauth_provider_callback(
         email=email,
         subject=str(subject),
         display_name=profile.get("name") or email.split("@")[0],
+        intent=intent,
     )

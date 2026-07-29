@@ -19,6 +19,7 @@ function LoginInner() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
+  const [ssoLoading, setSsoLoading] = useState(true);
   const [ssoNote, setSsoNote] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +32,8 @@ function LoginInner() {
       .catch(() => {
         setProviders([]);
         setSsoNote("Sign-in providers unavailable — check your connection and try again.");
-      });
+      })
+      .finally(() => setSsoLoading(false));
   }, []);
 
   useEffect(() => {
@@ -76,8 +78,8 @@ function LoginInner() {
           <div className="auth-card">
             <h1>Welcome back</h1>
             <p className="sub">Sign in to your Woney account</p>
-            <SsoButtons providers={providers} />
-            {ssoNote && !providers.length && <p className="muted">{ssoNote}</p>}
+            <SsoButtons providers={providers} intent="login" loading={ssoLoading} />
+            {ssoNote && !providers.length && !ssoLoading && <p className="muted">{ssoNote}</p>}
             <form onSubmit={submitLogin}>
               <div className="field">
                 <label htmlFor="email">Email</label>
