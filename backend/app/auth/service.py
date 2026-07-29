@@ -65,7 +65,6 @@ async def issue_login_mfa_challenge(
         emailed = await send_login_mfa_code(user.email, plain)
 
     totp_ok = authenticator_enabled(user)
-    settings = get_settings()
     dev_code: str | None = None
     if emailed:
         primary = "email"
