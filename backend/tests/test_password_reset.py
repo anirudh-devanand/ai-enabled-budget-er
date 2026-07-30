@@ -1,7 +1,7 @@
 import os
 
 from app.core.config import get_settings
-from tests.conftest import register_and_login
+from tests.conftest import complete_mfa_if_needed, register_and_login
 
 
 async def test_password_reset_roundtrip_dev_fallback(client, register_payload):
@@ -30,7 +30,7 @@ async def test_password_reset_roundtrip_dev_fallback(client, register_payload):
     )
     assert resp.status_code == 204, resp.text
 
-    # Old password fails; new password works.
+    # Old password fails; new password works (through MFA when enabled).
     resp = await client.post(
         "/v1/auth/login",
         json={"email": register_payload["email"], "password": register_payload["password"]},
@@ -41,8 +41,8 @@ async def test_password_reset_roundtrip_dev_fallback(client, register_payload):
         "/v1/auth/login",
         json={"email": register_payload["email"], "password": new_password},
     )
-    assert resp.status_code == 200
-    assert "access_token" in resp.json()
+    _, tokens = await complete_mfa_if_needed(client, resp)
+    assert "access_token" in tokens
 
     # Token is single-use.
     resp = await client.post(

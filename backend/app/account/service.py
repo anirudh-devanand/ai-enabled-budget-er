@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.account.email import email_configured, send_deletion_code
 from app.account.models import AccountDeletionChallenge
 from app.account.schemas import DeleteRequestResponse
-from app.auth.service import verify_mfa_code, verify_totp
+from app.auth.service import authenticator_enabled, verify_mfa_code, verify_totp
 from app.core.security import hash_refresh_token, verify_password
 from app.households.models import Household, HouseholdMember
 from app.users.models import User
@@ -87,7 +87,7 @@ async def request_deletion(db: AsyncSession, user: User) -> DeleteRequestRespons
             code=None,
         )
 
-    if user.mfa_enabled:
+    if authenticator_enabled(user):
         return DeleteRequestResponse(
             delivery="totp",
             expires_in_seconds=OTP_TTL_SECONDS,

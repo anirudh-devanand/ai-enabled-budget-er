@@ -12,7 +12,7 @@ import { authErrorMessage } from "@/lib/errors";
 import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 
 /** Bump when changing OAuth callback behavior — confirms Vercel shipped this build. */
-export const OAUTH_CALLBACK_BUILD = "2026-07-29-mfa-handoff-v2";
+const OAUTH_CALLBACK_BUILD = "2026-07-29-mfa-handoff-v2";
 
 const OAUTH_CODE_KEY = "woney.oauth_code_used";
 const OAUTH_REDIRECT_KEY = "woney.oauth_redirect_uri";
