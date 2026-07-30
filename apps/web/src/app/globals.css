@@ -1461,7 +1461,9 @@ textarea:-webkit-autofill:focus {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  justify-content: center;
+  line-height: 1;
+  padding: 3px 8px;
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
@@ -1470,11 +1472,13 @@ textarea:-webkit-autofill:focus {
   background: var(--surface-muted);
   color: var(--muted);
   border: 1px solid var(--border);
+  margin: 0;
 }
 
-.status-pill.error {
+.status-pill--error {
   background: var(--danger-soft);
   color: var(--danger);
+  border-color: transparent;
 }
 
 .account-hero {

@@ -510,7 +510,7 @@ export default function AccountPage() {
             <div className="bank-row-meta">
               <div className="name">{c.institution_name || `${c.provider} connection`}</div>
               <div className="sub">
-                <span className={`status-pill${c.status === "error" ? " error" : ""}`}>
+                <span className={`status-pill${c.status === "error" ? " status-pill--error" : ""}`}>
                   {c.status}
                 </span>
                 <span>{formatSynced(c.last_synced_at)}</span>
