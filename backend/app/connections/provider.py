@@ -13,6 +13,10 @@ from typing import Protocol
 class ProviderError(Exception):
     """Raised when the aggregator rejects a request or returns bad data."""
 
+    def __init__(self, message: str, *, code: str | None = None):
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass
 class ProviderTransaction:

@@ -62,7 +62,12 @@ def _map_account_type(subtype: str | None, type_: str | None) -> str:
 class PlaidProvider:
     """`login_id` for this provider is a Plaid access_token."""
 
-    async def create_link_token(self, *, client_user_id: str) -> str:
+    async def create_link_token(
+        self,
+        *,
+        client_user_id: str,
+        access_token: str | None = None,
+    ) -> str:
         settings = get_settings()
         if not settings.plaid_configured:
             raise ProviderError(
@@ -70,15 +75,23 @@ class PlaidProvider:
                 "— or legacy LEDGER_PLAID_* — on the Render API service, not only on Vercel; "
                 "redeploy, then GET /healthz should show plaid_configured: true)"
             )
-        body = {
+        body: dict[str, Any] = {
             "client_id": settings.plaid_client_id,
             "secret": settings.plaid_secret,
             "client_name": "Woney",
             "language": "en",
-            "country_codes": [c.strip().upper() for c in settings.plaid_country_codes.split(",") if c.strip()],
+            "country_codes": [
+                c.strip().upper() for c in settings.plaid_country_codes.split(",") if c.strip()
+            ],
             "user": {"client_user_id": client_user_id},
-            "products": [p.strip() for p in settings.plaid_products.split(",") if p.strip()],
         }
+        if access_token:
+            # Update mode — re-auth an existing Item. Do not send products.
+            body["access_token"] = access_token
+        else:
+            body["products"] = [
+                p.strip() for p in settings.plaid_products.split(",") if p.strip()
+            ]
         data = await self._post("/link/token/create", body)
         token = data.get("link_token")
         if not token:
@@ -182,8 +195,18 @@ class PlaidProvider:
         except ValueError as exc:
             raise ProviderError(f"Plaid returned non-JSON ({resp.status_code})") from exc
         if resp.status_code >= 400:
-            err = data.get("error_message") or data.get("error_code") or resp.text
-            raise ProviderError(f"Plaid {path} failed: {err}")
+            code = data.get("error_code") if isinstance(data, dict) else None
+            err = (
+                (data.get("error_message") if isinstance(data, dict) else None)
+                or code
+                or resp.text
+            )
+            if code == "ITEM_LOGIN_REQUIRED":
+                raise ProviderError(
+                    "Your bank needs you to sign in again. Reconnect it with Plaid Link update mode.",
+                    code=code,
+                )
+            raise ProviderError(f"Plaid {path} failed: {err}", code=str(code) if code else None)
         return data
 
 

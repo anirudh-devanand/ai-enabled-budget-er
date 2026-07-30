@@ -63,10 +63,12 @@ function ConnectInner() {
   const router = useRouter();
   const params = useSearchParams();
   const householdId = params.get("household");
+  const reconnectId = params.get("reconnect");
   const [tab, setTab] = useState<Tab>("plaid");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [updateMode, setUpdateMode] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const submitted = useRef(false);
 
@@ -89,9 +91,13 @@ function ConnectInner() {
           return;
         }
         await loadPlaidScript();
-        const { link_token } = await api.createPlaidLinkToken(householdId);
+        const { link_token, update_mode } = await api.createPlaidLinkToken(
+          householdId,
+          reconnectId || undefined,
+        );
         if (!cancelled) {
           setLinkToken(link_token);
+          setUpdateMode(Boolean(update_mode || reconnectId));
           setStatus("ready");
         }
       } catch (err) {
@@ -104,7 +110,7 @@ function ConnectInner() {
     return () => {
       cancelled = true;
     };
-  }, [householdId]);
+  }, [householdId, reconnectId]);
 
   const openPlaid = useCallback(() => {
     if (!householdId || !linkToken || !window.Plaid || submitted.current) return;
@@ -116,7 +122,12 @@ function ConnectInner() {
         setStatus("syncing");
         setError(null);
         try {
-          await api.createPlaidConnection(householdId, publicToken);
+          if (updateMode && reconnectId) {
+            // Update mode restores the existing Item — no new public_token exchange.
+            await api.completePlaidReauth(reconnectId);
+          } else {
+            await api.createPlaidConnection(householdId, publicToken);
+          }
           router.replace("/dashboard");
         } catch (err) {
           submitted.current = false;
@@ -132,7 +143,7 @@ function ConnectInner() {
       },
     });
     handler.open();
-  }, [householdId, linkToken, router]);
+  }, [householdId, linkToken, router, updateMode, reconnectId]);
 
   async function onCsvSubmit(e: FormEvent) {
     e.preventDefault();
@@ -192,8 +203,12 @@ function ConnectInner() {
     <AppShell householdId={householdId}>
       <div className="page-header">
         <div>
-          <h1>Link a bank</h1>
-          <p>Connect with Plaid, or import a CSV for banks like Neo that need a manual path.</p>
+          <h1>{updateMode ? "Reconnect your bank" : "Link a bank"}</h1>
+          <p>
+            {updateMode
+              ? "Your bank needs a fresh login (password, MFA, or security check). Complete Plaid Link to restore sync."
+              : "Connect with Plaid, or import a CSV for banks like Neo that need a manual path."}
+          </p>
         </div>
         <div className="page-actions">
           <button type="button" className="btn btn-ghost" onClick={() => router.push("/dashboard")}>
@@ -243,8 +258,13 @@ function ConnectInner() {
                 disabled={!linkToken || status === "syncing"}
                 onClick={openPlaid}
               >
-                {linkToken ? "Open Plaid Link" : "Preparing Link…"}
+                {linkToken ? (updateMode ? "Reconnect with Plaid" : "Open Plaid Link") : "Preparing Link…"}
               </button>
+            )}
+            {updateMode && (
+              <p className="muted" style={{ marginTop: 12 }}>
+                This updates your existing connection — it won’t create a duplicate bank link.
+              </p>
             )}
           </section>
         )}

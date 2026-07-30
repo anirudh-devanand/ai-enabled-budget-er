@@ -128,8 +128,26 @@ async def create_plaid_link_token(
     await _require_mfa_enabled(user, db, request)
     await _require_membership(db, user, body.household_id)
     await _require_owner(db, user, body.household_id)
+    access_token: str | None = None
+    update_mode = False
+    if body.connection_id is not None:
+        connection = await service.get_connection_for_user(db, body.connection_id, user.id)
+        if connection is None or connection.household_id != body.household_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+        if connection.provider != "plaid":
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Only Plaid connections can be reconnected with Link update mode",
+            )
+        from app.core.security import decrypt_secret
+
+        access_token = decrypt_secret(connection.login_id_encrypted)
+        update_mode = True
     try:
-        token = await PlaidProvider().create_link_token(client_user_id=str(user.id))
+        token = await PlaidProvider().create_link_token(
+            client_user_id=str(user.id),
+            access_token=access_token,
+        )
     except ProviderError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
     await record_security_event(
@@ -137,10 +155,51 @@ async def create_plaid_link_token(
         event_type="plaid_link_token",
         user_id=user.id,
         request=request,
-        meta={"household_id": str(body.household_id)},
+        meta={
+            "household_id": str(body.household_id),
+            "update_mode": update_mode,
+            "connection_id": str(body.connection_id) if body.connection_id else None,
+        },
         commit=True,
     )
-    return PlaidLinkTokenResponse(link_token=token)
+    return PlaidLinkTokenResponse(link_token=token, update_mode=update_mode)
+
+
+@router.post("/plaid/{connection_id}/reauth-complete", response_model=ConnectionResponse)
+async def complete_plaid_reauth(
+    connection_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbDep,
+    provider: ProviderDep,
+    request: Request,
+):
+    """After Plaid Link update mode succeeds, pull a fresh snapshot."""
+    await _require_mfa_enabled(user, db, request)
+    connection = await service.get_connection_for_user(db, connection_id, user.id)
+    if connection is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found")
+    await _require_owner(db, user, connection.household_id)
+    if connection.provider != "plaid":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Not a Plaid connection")
+    try:
+        connection = await service.sync_connection(db, connection, provider)
+    except ProviderError as exc:
+        code = getattr(exc, "code", None)
+        if code == "ITEM_LOGIN_REQUIRED":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Bank login is still required. Finish Plaid Link update mode and try again.",
+            ) from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
+    await record_security_event(
+        db,
+        event_type="plaid_reauth_complete",
+        user_id=user.id,
+        request=request,
+        meta={"connection_id": str(connection_id)},
+        commit=True,
+    )
+    return connection
 
 
 @router.post("/plaid", response_model=ConnectionResponse, status_code=status.HTTP_201_CREATED)
@@ -327,6 +386,12 @@ async def resync_connection(
             meta={"connection_id": str(connection_id)},
             commit=True,
         )
+        if getattr(exc, "code", None) == "ITEM_LOGIN_REQUIRED":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "ITEM_LOGIN_REQUIRED: Your bank needs you to sign in again. "
+                f"Open /connect?household={connection.household_id}&reconnect={connection.id}",
+            ) from exc
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
 
 

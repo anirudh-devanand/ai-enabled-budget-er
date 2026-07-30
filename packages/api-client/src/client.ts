@@ -349,11 +349,23 @@ export class WoneyClient {
     );
   }
 
-  createPlaidLinkToken(householdId: string) {
-    return this.request<{ link_token: string }>(
+  createPlaidLinkToken(householdId: string, connectionId?: string) {
+    return this.request<{ link_token: string; update_mode?: boolean }>(
       "POST",
       "/v1/connections/plaid/link-token",
-      { household_id: householdId },
+      {
+        household_id: householdId,
+        ...(connectionId ? { connection_id: connectionId } : {}),
+      },
+      { auth: true },
+    );
+  }
+
+  completePlaidReauth(connectionId: string) {
+    return this.request<ConnectionResponse>(
+      "POST",
+      `/v1/connections/plaid/${connectionId}/reauth-complete`,
+      {},
       { auth: true },
     );
   }

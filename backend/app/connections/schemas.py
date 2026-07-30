@@ -13,10 +13,13 @@ class ConnectionCreateRequest(BaseModel):
 
 class PlaidLinkTokenRequest(BaseModel):
     household_id: uuid.UUID
+    # When set, creates an update-mode Link token for that connection (ITEM_LOGIN_REQUIRED).
+    connection_id: uuid.UUID | None = None
 
 
 class PlaidLinkTokenResponse(BaseModel):
     link_token: str
+    update_mode: bool = False
 
 
 class PlaidExchangeRequest(BaseModel):

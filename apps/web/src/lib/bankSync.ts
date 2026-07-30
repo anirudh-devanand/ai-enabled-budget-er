@@ -75,7 +75,7 @@ export async function syncMyBanks(options?: {
       };
       const error =
         response.failed > 0
-          ? `Synced ${response.synced}, ${response.failed} failed`
+          ? `Synced ${response.synced}, ${response.failed} failed — if your bank needs a new login, reconnect it from Connect (Plaid update).`
           : null;
       emit({ syncing: false, error, result });
       return result;
