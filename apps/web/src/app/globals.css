@@ -179,12 +179,16 @@ textarea {
 }
 
 .auth-card {
+  /* Always-light card: pin ink/contrast so dark-theme --text/--accent flips don't wash out controls */
+  --auth-ink: #141414;
+  --auth-ink-hover: #2a2a2a;
+  --auth-contrast: #ffffff;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   flex: 1;
   background: #ffffff;
-  color: #141414;
+  color: var(--auth-ink);
   border: 1px solid #e8e8e4;
   border-radius: 24px;
   box-shadow: var(--shadow);
@@ -291,21 +295,28 @@ textarea {
 }
 
 .auth-card .btn-primary {
-  background: #141414;
-  color: #ffffff;
-  border-color: #141414;
+  background: var(--auth-ink);
+  color: var(--auth-contrast);
+  border-color: var(--auth-ink);
 }
 
+.auth-card .btn-primary:hover:not(:disabled) {
+  background: var(--auth-ink-hover);
+  border-color: var(--auth-ink-hover);
+  color: var(--auth-contrast);
+}
+
+/* Secondary auth actions (MFA alternatives, etc.): solid ink fill for contrast on white card */
 .auth-card .btn-ghost {
-  background: #ffffff;
-  color: #141414;
-  border-color: #e6e6e1;
+  background: var(--auth-ink);
+  color: var(--auth-contrast);
+  border-color: var(--auth-ink);
 }
 
 .auth-card .btn-ghost:hover:not(:disabled) {
-  background: #f6f6f4;
-  border-color: #141414;
-  color: #141414;
+  background: var(--auth-ink-hover);
+  border-color: var(--auth-ink-hover);
+  color: var(--auth-contrast);
 }
 
 .auth-card .sso-btn {
