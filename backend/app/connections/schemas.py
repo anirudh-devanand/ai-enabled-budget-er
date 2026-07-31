@@ -39,10 +39,20 @@ class ConnectionResponse(BaseModel):
     created_at: datetime
 
 
+class SyncReauthRequired(BaseModel):
+    """Connection that failed sync with ITEM_LOGIN_REQUIRED (or equivalent)."""
+
+    connection_id: uuid.UUID
+    household_id: uuid.UUID
+    institution_name: str | None = None
+    code: str = "ITEM_LOGIN_REQUIRED"
+
+
 class SyncMineResponse(BaseModel):
     synced: int
     failed: int
     skipped: int = 0
+    reauth_required: list[SyncReauthRequired] = []
 
 
 class CsvImportResponse(BaseModel):

@@ -1,7 +1,55 @@
-import { ApiError } from "@woney/api-client";
+import { ApiError, getApiDetailObject } from "@woney/api-client";
+
+export type BankReauthTarget = {
+  connectionId: string;
+  householdId: string;
+  institutionName: string | null;
+  code: string;
+};
 
 export function isUnauthorized(err: unknown): boolean {
   return getApiStatus(err) === 401;
+}
+
+/** Detect Plaid ITEM_LOGIN_REQUIRED (and parse reconnect deep-link fields). */
+export function parseItemLoginRequired(err: unknown): BankReauthTarget | null {
+  const obj = getApiDetailObject(err);
+  if (obj) {
+    const code = typeof obj.code === "string" ? obj.code : "";
+    if (code === "ITEM_LOGIN_REQUIRED") {
+      const connectionId = typeof obj.connection_id === "string" ? obj.connection_id : "";
+      const householdId = typeof obj.household_id === "string" ? obj.household_id : "";
+      if (connectionId && householdId) {
+        return {
+          connectionId,
+          householdId,
+          institutionName:
+            typeof obj.institution_name === "string" ? obj.institution_name : null,
+          code,
+        };
+      }
+    }
+  }
+
+  const detail = getApiDetail(err, "");
+  if (!/ITEM_LOGIN_REQUIRED/i.test(detail)) return null;
+
+  const match = detail.match(
+    /\/connect\?household=([0-9a-f-]{36})&reconnect=([0-9a-f-]{36})/i,
+  );
+  if (match) {
+    return {
+      householdId: match[1],
+      connectionId: match[2],
+      institutionName: null,
+      code: "ITEM_LOGIN_REQUIRED",
+    };
+  }
+  return null;
+}
+
+export function reconnectPath(target: BankReauthTarget): string {
+  return `/connect?household=${encodeURIComponent(target.householdId)}&reconnect=${encodeURIComponent(target.connectionId)}`;
 }
 
 export function getApiStatus(err: unknown): number | null {

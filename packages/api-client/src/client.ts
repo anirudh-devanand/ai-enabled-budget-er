@@ -36,6 +36,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public detail: string,
+    /** Raw JSON body from the API when available (for structured errors). */
+    public data?: unknown,
   ) {
     super(detail);
   }
@@ -66,6 +68,11 @@ export function formatApiDetail(data: unknown, fallback: string): string {
     const joined = parts.filter(Boolean).join("; ");
     if (joined) return joined;
   }
+  if (detail && typeof detail === "object") {
+    const obj = detail as Record<string, unknown>;
+    if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
+    if (typeof obj.code === "string" && obj.code.trim()) return obj.code;
+  }
   if (detail != null) {
     try {
       return JSON.stringify(detail);
@@ -74,6 +81,17 @@ export function formatApiDetail(data: unknown, fallback: string): string {
     }
   }
   return fallback || "Request failed";
+}
+
+/** Extract structured `detail` object from an ApiError / FastAPI body when present. */
+export function getApiDetailObject(err: unknown): Record<string, unknown> | null {
+  if (err instanceof ApiError && err.data && typeof err.data === "object") {
+    const detail = (err.data as { detail?: unknown }).detail;
+    if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+      return detail as Record<string, unknown>;
+    }
+  }
+  return null;
 }
 
 export interface TokenStorage {
@@ -140,13 +158,14 @@ export class WoneyClient {
     }
     if (!resp.ok) {
       let detail = resp.statusText || `HTTP ${resp.status}`;
+      let data: unknown;
       try {
-        const data = await resp.json();
+        data = await resp.json();
         detail = formatApiDetail(data, detail);
       } catch {
         // non-JSON error body
       }
-      throw new ApiError(resp.status, detail);
+      throw new ApiError(resp.status, detail, data);
     }
     if (resp.status === 204) return undefined as T;
     return (await resp.json()) as T;
@@ -415,13 +434,14 @@ export class WoneyClient {
     }
     if (!resp.ok) {
       let detail = resp.statusText || `HTTP ${resp.status}`;
+      let data: unknown;
       try {
-        const data = await resp.json();
+        data = await resp.json();
         detail = formatApiDetail(data, detail);
       } catch {
         // ignore
       }
-      throw new ApiError(resp.status, detail);
+      throw new ApiError(resp.status, detail, data);
     }
     return (await resp.json()) as {
       connection: ConnectionResponse;

@@ -690,6 +690,60 @@ textarea {
   text-decoration: underline;
 }
 
+.reauth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--bg, #0e1110) 55%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.reauth-dialog {
+  width: min(100%, 420px);
+  padding: 1.35rem 1.4rem 1.25rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.reauth-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.reauth-dialog .sub {
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.reauth-dialog .sub strong {
+  color: var(--text, inherit);
+  font-weight: 600;
+}
+
+.reauth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.reauth-list {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+}
+
+.reauth-list a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .hero-balance,
 .list-card,
 .grid,

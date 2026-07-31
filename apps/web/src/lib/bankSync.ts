@@ -1,13 +1,19 @@
 "use client";
 
+import type { SyncReauthRequired } from "@woney/api-client";
 import { api } from "@/lib/api";
-import { getApiDetail } from "@/lib/errors";
+import {
+  getApiDetail,
+  parseItemLoginRequired,
+  type BankReauthTarget,
+} from "@/lib/errors";
 
 export type BankSyncResult = {
   synced: number;
   failed: number;
   skipped: number;
   deduped: boolean;
+  reauthRequired: BankReauthTarget[];
 };
 
 export type BankSyncState = {
@@ -15,6 +21,8 @@ export type BankSyncState = {
   error: string | null;
   result: BankSyncResult | null;
   lastStartedAt: number;
+  /** Connections that need Plaid Link update mode after a sync attempt. */
+  reauthRequired: BankReauthTarget[];
 };
 
 export const BANK_SYNC_DEBOUNCE_MS = 15_000;
@@ -25,6 +33,7 @@ let state: BankSyncState = {
   error: null,
   result: null,
   lastStartedAt: 0,
+  reauthRequired: [],
 };
 const listeners = new Set<(s: BankSyncState) => void>();
 
@@ -43,6 +52,28 @@ export function subscribeBankSync(listener: (s: BankSyncState) => void) {
   return () => {
     listeners.delete(listener);
   };
+}
+
+function mapReauth(items: SyncReauthRequired[] | undefined): BankReauthTarget[] {
+  if (!items?.length) return [];
+  return items
+    .filter((item) => item.code === "ITEM_LOGIN_REQUIRED" && item.connection_id && item.household_id)
+    .map((item) => ({
+      connectionId: item.connection_id,
+      householdId: item.household_id,
+      institutionName: item.institution_name ?? null,
+      code: item.code,
+    }));
+}
+
+/** Show (or replace) the in-app bank re-login prompt. */
+export function promptBankReauth(targets: BankReauthTarget[]) {
+  if (!targets.length) return;
+  emit({ reauthRequired: targets });
+}
+
+export function dismissBankReauth() {
+  emit({ reauthRequired: [] });
 }
 
 /**
@@ -67,19 +98,40 @@ export async function syncMyBanks(options?: {
   inflight = (async () => {
     try {
       const response = await api.syncMineBanks();
+      const reauthRequired = mapReauth(response.reauth_required);
       const result: BankSyncResult = {
         synced: response.synced,
         failed: response.failed,
         skipped: response.skipped,
         deduped: false,
+        reauthRequired,
       };
       const error =
-        response.failed > 0
-          ? `Synced ${response.synced}, ${response.failed} failed — if your bank needs a new login, reconnect it from Connect (Plaid update).`
+        response.failed > 0 && reauthRequired.length === 0
+          ? `Synced ${response.synced}, ${response.failed} failed`
           : null;
-      emit({ syncing: false, error, result });
+      emit({
+        syncing: false,
+        error,
+        result,
+        // Replace prompt when this sync reports reauth; clear when none needed.
+        reauthRequired,
+      });
       return result;
     } catch (err) {
+      const reauth = parseItemLoginRequired(err);
+      if (reauth) {
+        const empty: BankSyncResult = {
+          synced: 0,
+          failed: 1,
+          skipped: 0,
+          deduped: false,
+          reauthRequired: [reauth],
+        };
+        emit({ syncing: false, error: null, result: empty });
+        promptBankReauth([reauth]);
+        return empty;
+      }
       const message = getApiDetail(err) || "Bank sync failed";
       // MFA not enabled yet — not an error for login kickoff / soft refresh.
       if (message === "mfa_required" || /mfa_required/i.test(message)) {
@@ -88,6 +140,7 @@ export async function syncMyBanks(options?: {
           failed: 0,
           skipped: 0,
           deduped: false,
+          reauthRequired: [],
         };
         emit({ syncing: false, error: null, result: empty });
         return empty;

@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections.models import Account, BankConnection, Transaction
-from app.connections.provider import BankProvider, ProviderSnapshot
+from app.connections.provider import BankProvider, ProviderError, ProviderSnapshot
 from app.core.security import decrypt_field, decrypt_secret, encrypt_field, encrypt_secret
 from app.enrichment.service import enrich_transactions
 from app.households.models import HouseholdMember
@@ -220,10 +220,11 @@ async def list_connections_for_user(
 
 async def sync_user_connections(
     db: AsyncSession, user_id: uuid.UUID, provider: BankProvider
-) -> dict[str, int]:
+) -> dict:
     """Pull-sync every non-CSV connection for the user's households."""
     connections = await list_connections_for_user(db, user_id)
     ok = fail = skipped = 0
+    reauth_required: list[dict] = []
     for connection in connections:
         if connection.provider == "csv":
             skipped += 1
@@ -231,9 +232,25 @@ async def sync_user_connections(
         try:
             await sync_connection(db, connection, provider)
             ok += 1
+        except ProviderError as exc:
+            fail += 1
+            if getattr(exc, "code", None) == "ITEM_LOGIN_REQUIRED":
+                reauth_required.append(
+                    {
+                        "connection_id": connection.id,
+                        "household_id": connection.household_id,
+                        "institution_name": connection.institution_name,
+                        "code": "ITEM_LOGIN_REQUIRED",
+                    }
+                )
         except Exception:
             fail += 1
-    return {"synced": ok, "failed": fail, "skipped": skipped}
+    return {
+        "synced": ok,
+        "failed": fail,
+        "skipped": skipped,
+        "reauth_required": reauth_required,
+    }
 
 
 async def list_accounts(db: AsyncSession, household_id: uuid.UUID) -> list[Account]:

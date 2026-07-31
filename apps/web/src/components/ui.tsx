@@ -5,8 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CategoryIcon } from "@/components/CategoryChip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BankReauthPrompt } from "@/components/BankReauthPrompt";
 import { api } from "@/lib/api";
-import { getBankSyncState, subscribeBankSync, syncMyBanks } from "@/lib/bankSync";
+import {
+  getBankSyncState,
+  subscribeBankSync,
+  syncMyBanks,
+  type BankSyncState,
+} from "@/lib/bankSync";
 import { passwordScore } from "@/lib/ui";
 
 export { CategoryIcon };
@@ -36,6 +42,7 @@ export function AppShell({
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [reauthRequired, setReauthRequired] = useState<BankSyncState["reauthRequired"]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,8 +63,10 @@ export function AppShell({
     // Preserve in-flight login sync so we refresh when it finishes.
     let wasSyncing = getBankSyncState().syncing;
     setSyncing(wasSyncing);
+    setReauthRequired(getBankSyncState().reauthRequired);
     return subscribeBankSync((state) => {
       setSyncing(state.syncing);
+      setReauthRequired(state.reauthRequired);
       if (wasSyncing && !state.syncing && onRefresh) {
         void Promise.resolve(onRefresh()).catch(() => undefined);
       }
@@ -79,7 +88,10 @@ export function AppShell({
     }
     try {
       const result = await syncMyBanks({ force: true });
-      if (result.failed > 0) {
+      if (result.reauthRequired.length > 0) {
+        // Modal is driven by bankSync state — avoid a cryptic toast.
+        setToast(null);
+      } else if (result.failed > 0) {
         setToast(`Synced ${result.synced}, ${result.failed} failed`);
       } else if (result.synced === 0 && result.skipped === 0) {
         setToast("No banks to sync");
@@ -144,6 +156,7 @@ export function AppShell({
         {toast && <div className="toast app-chrome-toast">{toast}</div>}
         {children}
       </div>
+      <BankReauthPrompt targets={reauthRequired} />
     </div>
   );
 }

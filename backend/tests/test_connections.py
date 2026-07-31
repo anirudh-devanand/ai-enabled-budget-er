@@ -13,13 +13,22 @@ from tests.conftest import disable_mfa, enable_mfa, register_and_login
 
 
 class FakeProvider:
-    def __init__(self, snapshot: ProviderSnapshot | None = None, fail: bool = False):
+    def __init__(
+        self,
+        snapshot: ProviderSnapshot | None = None,
+        fail: bool = False,
+        *,
+        error_code: str | None = None,
+    ):
         self.snapshot = snapshot
         self.fail = fail
+        self.error_code = error_code
         self.calls = 0
 
     async def fetch_snapshot(self, login_id: str) -> ProviderSnapshot:
         self.calls += 1
+        if self.error_code:
+            raise ProviderError("bank login required", code=self.error_code)
         if self.fail or self.snapshot is None:
             raise ProviderError("simulated aggregator failure")
         return self.snapshot
@@ -201,6 +210,37 @@ async def test_provider_failure_marks_connection_error(client, register_payload)
         f"/v1/connections/?household_id={household_id}", headers=headers
     )
     assert resp.json()[0]["status"] == "error"
+
+
+async def test_sync_item_login_required_returns_reconnect_payload(client, register_payload):
+    headers, household_id = await _setup(client, register_payload)
+    _use_provider(FakeProvider(_snapshot()))
+    create = await client.post(
+        "/v1/connections/",
+        json={"household_id": household_id, "login_id": "flinks-login-abc123"},
+        headers=headers,
+    )
+    assert create.status_code == 201
+    connection_id = create.json()["id"]
+
+    _use_provider(FakeProvider(error_code="ITEM_LOGIN_REQUIRED"))
+    resp = await client.post(f"/v1/connections/{connection_id}/sync", headers=headers)
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["code"] == "ITEM_LOGIN_REQUIRED"
+    assert detail["connection_id"] == connection_id
+    assert detail["household_id"] == household_id
+    assert detail["institution_name"] == "Neo Financial"
+
+    mine = await client.post("/v1/connections/sync-mine", headers=headers)
+    assert mine.status_code == 200
+    body = mine.json()
+    assert body["failed"] == 1
+    assert body["synced"] == 0
+    assert len(body["reauth_required"]) == 1
+    assert body["reauth_required"][0]["connection_id"] == connection_id
+    assert body["reauth_required"][0]["household_id"] == household_id
+    assert body["reauth_required"][0]["code"] == "ITEM_LOGIN_REQUIRED"
 
 
 async def test_connections_scoped_to_household_membership(client, register_payload):

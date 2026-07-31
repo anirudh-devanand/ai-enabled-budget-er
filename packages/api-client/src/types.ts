@@ -78,10 +78,18 @@ export interface ConnectionResponse {
   created_at: string;
 }
 
+export interface SyncReauthRequired {
+  connection_id: string;
+  household_id: string;
+  institution_name: string | null;
+  code: string;
+}
+
 export interface SyncMineResponse {
   synced: number;
   failed: number;
   skipped: number;
+  reauth_required?: SyncReauthRequired[];
 }
 
 export interface AccountResponse {

@@ -14,7 +14,8 @@ import { CategoryGlyph } from "@/components/CategoryIcon";
 import { CategoryIcon, AppShell } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
-import { getApiDetail, isUnauthorized } from "@/lib/errors";
+import { promptBankReauth } from "@/lib/bankSync";
+import { getApiDetail, isUnauthorized, parseItemLoginRequired } from "@/lib/errors";
 
 function formatSynced(iso: string | null | undefined) {
   if (!iso) return "Never synced";
@@ -136,8 +137,14 @@ export default function AccountPage() {
       await api.syncConnection(connectionId);
       setToast("Accounts refreshed");
       await load();
-    } catch {
-      setToast("Sync failed");
+    } catch (err) {
+      const reauth = parseItemLoginRequired(err);
+      if (reauth) {
+        promptBankReauth([reauth]);
+        setToast(null);
+      } else {
+        setToast("Sync failed");
+      }
     } finally {
       setSyncingId(null);
       setTimeout(() => setToast(null), 2500);

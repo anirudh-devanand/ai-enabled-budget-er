@@ -188,7 +188,15 @@ async def complete_plaid_reauth(
         if code == "ITEM_LOGIN_REQUIRED":
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "Bank login is still required. Finish Plaid Link update mode and try again.",
+                detail={
+                    "code": "ITEM_LOGIN_REQUIRED",
+                    "message": (
+                        "Bank login is still required. Finish Plaid Link update mode and try again."
+                    ),
+                    "connection_id": str(connection.id),
+                    "household_id": str(connection.household_id),
+                    "institution_name": connection.institution_name,
+                },
             ) from exc
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
     await record_security_event(
@@ -389,8 +397,16 @@ async def resync_connection(
         if getattr(exc, "code", None) == "ITEM_LOGIN_REQUIRED":
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "ITEM_LOGIN_REQUIRED: Your bank needs you to sign in again. "
-                f"Open /connect?household={connection.household_id}&reconnect={connection.id}",
+                detail={
+                    "code": "ITEM_LOGIN_REQUIRED",
+                    "message": (
+                        "Your bank needs you to sign in again before sync can continue. "
+                        "Reconnect restores the existing link — it won’t create a duplicate."
+                    ),
+                    "connection_id": str(connection.id),
+                    "household_id": str(connection.household_id),
+                    "institution_name": connection.institution_name,
+                },
             ) from exc
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Bank sync failed: {exc}") from exc
 
