@@ -296,6 +296,18 @@ textarea {
   border-color: #141414;
 }
 
+.auth-card .btn-ghost {
+  background: #ffffff;
+  color: #141414;
+  border-color: #e6e6e1;
+}
+
+.auth-card .btn-ghost:hover:not(:disabled) {
+  background: #f6f6f4;
+  border-color: #141414;
+  color: #141414;
+}
+
 .auth-card .sso-btn {
   background: #ffffff;
   color: #141414;
