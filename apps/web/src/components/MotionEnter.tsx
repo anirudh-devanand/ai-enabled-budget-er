@@ -1,9 +1,42 @@
 "use client";
 
-import { motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
 import type { ReactNode } from "react";
 
 export const ENTER_EASE = [0.22, 1, 0.36, 1] as const;
+
+/** Auth / form alert with soft enter + optional shake. Static when reduced-motion. */
+export function AuthAlert({
+  message,
+  className = "error",
+}: {
+  message: string | null | undefined;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+
+  return (
+    <AnimatePresence>
+      {message ? (
+        <motion.div
+          key={message}
+          className={className}
+          role="alert"
+          initial={reduce ? false : { opacity: 0, y: -4 }}
+          animate={
+            reduce
+              ? { opacity: 1 }
+              : { opacity: 1, y: 0, x: [0, -4, 4, -2, 2, 0] }
+          }
+          exit={reduce ? undefined : { opacity: 0, y: -2 }}
+          transition={{ duration: reduce ? 0 : 0.32, ease: ENTER_EASE }}
+        >
+          {message}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
 
 type FadeInProps = {
   children: ReactNode;

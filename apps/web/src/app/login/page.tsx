@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isMfaChallenge, type OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { AuthAlert, FadeIn } from "@/components/MotionEnter";
 import { SsoButtons } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
@@ -75,7 +76,7 @@ function LoginInner() {
           lede="Clear categories, live Canadian bank sync, and a planner that never invents the math."
         />
         <section className="auth-panel">
-          <div className="auth-card">
+          <FadeIn y={10} className="auth-card">
             <h1>Welcome back</h1>
             <p className="sub">Sign in to your Woney account</p>
             <SsoButtons providers={providers} intent="login" loading={ssoLoading} />
@@ -106,7 +107,7 @@ function LoginInner() {
                   required
                 />
               </div>
-              {error && <div className="error">{error}</div>}
+              <AuthAlert message={error} />
               <button className="btn btn-primary btn-block" disabled={busy}>
                 {busy ? "Signing in…" : "Sign in"}
               </button>
@@ -116,7 +117,7 @@ function LoginInner() {
               {" · "}
               <Link href="/register">Create account</Link>
             </p>
-          </div>
+          </FadeIn>
         </section>
       </div>
     </main>

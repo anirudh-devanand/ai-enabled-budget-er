@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { MfaChallengeResponse } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { AuthAlert, FadeIn } from "@/components/MotionEnter";
 import { OtpInput } from "@/components/OtpInput";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
@@ -21,7 +21,6 @@ const OTP_LENGTH = 6;
 function MfaInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const reduceMotion = useReducedMotion();
   const [challenge, setChallenge] = useState<MfaChallengeResponse | null>(null);
   const [useAuthenticator, setUseAuthenticator] = useState(false);
   const [useRecovery, setUseRecovery] = useState(false);
@@ -138,7 +137,7 @@ function MfaInner() {
           lede="A short code confirms it’s really you before we open your household."
         />
         <section className="auth-panel">
-          <div className="auth-card">
+          <FadeIn y={10} className="auth-card">
             <h1>Confirm it’s you</h1>
             <p className="sub">{subtitle}</p>
 
@@ -166,7 +165,7 @@ function MfaInner() {
                     disabled={busy}
                   />
                 </div>
-                {error && <div className="error">{error}</div>}
+                <AuthAlert message={error} />
                 <button className="btn btn-primary btn-block" disabled={busy || !code.trim()}>
                   {busy ? "Verifying…" : "Verify"}
                 </button>
@@ -189,25 +188,7 @@ function MfaInner() {
                     aria-label={showingEmail ? "Email verification code" : "Authenticator code"}
                   />
                 </div>
-                <AnimatePresence>
-                  {error ? (
-                    <motion.div
-                      key={error}
-                      className="error"
-                      role="alert"
-                      initial={reduceMotion ? false : { opacity: 0, y: -4 }}
-                      animate={
-                        reduceMotion
-                          ? { opacity: 1 }
-                          : { opacity: 1, y: 0, x: [0, -4, 4, -2, 2, 0] }
-                      }
-                      exit={reduceMotion ? undefined : { opacity: 0 }}
-                      transition={{ duration: reduceMotion ? 0 : 0.32 }}
-                    >
-                      {error}
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                <AuthAlert message={error} />
                 {busy && (
                   <p className="muted" style={{ marginTop: 12 }}>
                     Verifying…
@@ -270,7 +251,7 @@ function MfaInner() {
                 Back to sign in
               </Link>
             </p>
-          </div>
+          </FadeIn>
         </section>
       </div>
     </main>

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { isMfaChallenge } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { FadeIn } from "@/components/MotionEnter";
 import { clearOAuthIntent, readOAuthIntent, readOAuthProvider } from "@/components/SsoButtons";
 import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
@@ -140,7 +141,7 @@ function OAuthCallbackInner() {
             lede="Something went wrong finishing Google sign-in. You can go back and try again."
           />
           <section className="auth-panel">
-            <div className="auth-card">
+            <FadeIn y={10} className="auth-card">
               <h1>Sign-in failed</h1>
               <p className="sub auth-error-detail">{error}</p>
               <button
@@ -150,7 +151,7 @@ function OAuthCallbackInner() {
               >
                 Back to sign in
               </button>
-            </div>
+            </FadeIn>
           </section>
         </div>
       </main>

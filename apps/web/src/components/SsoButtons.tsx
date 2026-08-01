@@ -1,6 +1,8 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { OAuthProvider } from "@woney/api-client";
+import { ENTER_EASE } from "@/components/MotionEnter";
 
 const PROVIDER_KEY = "woney_oauth_provider";
 const INTENT_KEY = "woney_oauth_intent";
@@ -107,6 +109,8 @@ type Props = {
 };
 
 export function SsoButtons({ providers, intent = "login", loading = false }: Props) {
+  const reduce = useReducedMotion();
+
   if (loading && !providers.length) {
     return (
       <>
@@ -124,44 +128,54 @@ export function SsoButtons({ providers, intent = "login", loading = false }: Pro
   if (!providers.length) return null;
 
   return (
-    <>
-      <div className="sso-row">
-        {providers.map((p) => {
-          const ready = Boolean(p.enabled && p.auth_url);
-          return (
-            <button
-              key={p.id}
-              type="button"
-              className="sso-btn"
-              disabled={!ready}
-              title={
-                ready
-                  ? `Continue with ${p.name}`
-                  : `${p.name} SSO — add WONEY_*_OAUTH credentials to enable`
-              }
-              onClick={() => {
-                if (!p.auth_url) return;
-                try {
-                  sessionStorage.setItem(PROVIDER_KEY, p.id);
-                } catch {
-                  /* private mode */
+    <AnimatePresence mode="wait">
+      <motion.div
+        key="sso-ready"
+        initial={reduce ? false : { opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduce ? 0 : 0.28, ease: ENTER_EASE }}
+      >
+        <div className="sso-row">
+          {providers.map((p) => {
+            const ready = Boolean(p.enabled && p.auth_url);
+            return (
+              <motion.button
+                key={p.id}
+                type="button"
+                className="sso-btn"
+                disabled={!ready}
+                title={
+                  ready
+                    ? `Continue with ${p.name}`
+                    : `${p.name} SSO — add WONEY_*_OAUTH credentials to enable`
                 }
-                storeOAuthIntent(intent);
-                storeOAuthRedirectFromAuthUrl(p.auth_url);
-                window.location.href = p.auth_url;
-              }}
-            >
-              <span className="sso-icon">{logoFor(p.id)}</span>
-              <span>
-                Continue with {p.name}
-                {!ready ? " (soon)" : ""}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="sso-divider">or use email</div>
-    </>
+                whileHover={reduce || !ready ? undefined : { y: -1 }}
+                whileTap={reduce || !ready ? undefined : { scale: 0.985 }}
+                transition={{ duration: 0.16, ease: ENTER_EASE }}
+                onClick={() => {
+                  if (!p.auth_url) return;
+                  try {
+                    sessionStorage.setItem(PROVIDER_KEY, p.id);
+                  } catch {
+                    /* private mode */
+                  }
+                  storeOAuthIntent(intent);
+                  storeOAuthRedirectFromAuthUrl(p.auth_url);
+                  window.location.href = p.auth_url;
+                }}
+              >
+                <span className="sso-icon">{logoFor(p.id)}</span>
+                <span>
+                  Continue with {p.name}
+                  {!ready ? " (soon)" : ""}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+        <div className="sso-divider">or use email</div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

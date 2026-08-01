@@ -206,13 +206,30 @@ function RefreshIcon() {
 }
 
 export function PasswordStrength({ password }: { password: string }) {
+  const reduce = useReducedMotion();
   const { score, label, checks } = passwordScore(password);
   if (!password) return null;
   return (
-    <div className="pw-meter">
+    <motion.div
+      className="pw-meter"
+      initial={reduce ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.22, ease: PAGE_EASE }}
+    >
       <div className="pw-meter-bars" data-score={score}>
         {[1, 2, 3, 4].map((i) => (
-          <span key={i} className={i <= score ? "on" : ""} />
+          <motion.span
+            key={i}
+            className={i <= score ? "on" : ""}
+            animate={
+              reduce
+                ? undefined
+                : i <= score
+                  ? { scaleY: [0.85, 1], opacity: [0.7, 1] }
+                  : { scaleY: 1, opacity: 1 }
+            }
+            transition={{ duration: reduce ? 0 : 0.18, ease: PAGE_EASE }}
+          />
         ))}
       </div>
       <div className="pw-meter-label">
@@ -225,7 +242,7 @@ export function PasswordStrength({ password }: { password: string }) {
           </li>
         ))}
       </ul>
-    </div>
+    </motion.div>
   );
 }
 

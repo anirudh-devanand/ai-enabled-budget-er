@@ -246,7 +246,9 @@ export default function GoalsPage() {
 
       <div className="goals-grid">
         {goals.length === 0 && (
-          <p className="muted">No goals yet — create one to track progress.</p>
+          <FadeIn>
+            <p className="muted">No goals yet — create one to track progress.</p>
+          </FadeIn>
         )}
         {goals.map((g) => {
           const plan = plans[g.id];

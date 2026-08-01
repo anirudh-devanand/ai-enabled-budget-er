@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { isMfaChallenge, type OAuthProvider } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
+import { AuthAlert, FadeIn } from "@/components/MotionEnter";
 import { SsoButtons } from "@/components/SsoButtons";
 import { PasswordStrength } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -84,7 +85,7 @@ export default function RegisterPage() {
           footer="Trusted sync. Honest numbers."
         />
         <section className="auth-panel">
-          <div className="auth-card">
+          <FadeIn y={10} className="auth-card">
             <h1>Create your account</h1>
             <p className="sub">Takes about a minute — or continue with SSO.</p>
             <SsoButtons providers={providers} intent="signup" loading={ssoLoading} />
@@ -133,11 +134,11 @@ export default function RegisterPage() {
                 {busy ? "Creating…" : "Create account"}
               </button>
             </form>
-            {error && <p className="error">{error}</p>}
+            <AuthAlert message={error} />
             <p className="alt">
               Already have an account? <Link href="/login">Sign in</Link>
             </p>
-          </div>
+          </FadeIn>
         </section>
       </div>
     </main>
