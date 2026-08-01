@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { GoalResponse, GoalType, PlanResponse } from "@woney/api-client";
 import { GoalRing } from "@/components/charts/GoalRing";
+import { FadeIn } from "@/components/MotionEnter";
+import { GoalsSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
@@ -37,6 +39,7 @@ export default function GoalsPage() {
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [notes, setNotes] = useState("");
   const [contributeAmt, setContributeAmt] = useState<Record<string, string>>({});
+  const [ready, setReady] = useState(false);
 
   async function refresh(hid: string) {
     setGoals(await api.listGoals(hid));
@@ -55,6 +58,8 @@ export default function GoalsPage() {
         if (hid) await refresh(hid);
       } catch (err) {
         if (isUnauthorized(err)) router.replace("/login");
+      } finally {
+        setReady(true);
       }
     })();
   }, [router]);
@@ -150,6 +155,10 @@ export default function GoalsPage() {
         </div>
       )}
 
+      {!ready ? (
+        <GoalsSkeleton />
+      ) : (
+      <FadeIn>
       <div className="tile goal-form">
         <h2>New goal</h2>
         <div className="goal-form-grid">
@@ -391,6 +400,8 @@ export default function GoalsPage() {
           );
         })}
       </div>
+      </FadeIn>
+      )}
     </AppShell>
   );
 }

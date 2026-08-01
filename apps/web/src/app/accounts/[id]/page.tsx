@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { AccountDetailResponse, AccountResponse, TransactionResponse } from "@woney/api-client";
+import { FadeIn } from "@/components/MotionEnter";
+import { AccountDetailSkeleton } from "@/components/Skeleton";
 import { AppShell, CategoryIcon } from "@/components/ui";
-import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
@@ -100,86 +101,88 @@ export default function AccountDetailPage() {
 
   if (!account) {
     return (
-      <div className="app-main">
-        <WoneyLoader label="Loading account…" />
-      </div>
+      <AppShell householdId={householdId} onRefresh={load}>
+        <AccountDetailSkeleton />
+      </AppShell>
     );
   }
 
   return (
     <AppShell householdId={householdId} onRefresh={load}>
-      <div className="page-header">
-        <div>
-          <h1>{account.display_name || account.name}</h1>
-          <p>
-            {account.type}
-            {account.masked_number ? ` ····${account.masked_number}` : ""}
-            {account.institution_name ? ` · ${account.institution_name}` : ""}
-          </p>
+      <FadeIn>
+        <div className="page-header">
+          <div>
+            <h1>{account.display_name || account.name}</h1>
+            <p>
+              {account.type}
+              {account.masked_number ? ` ····${account.masked_number}` : ""}
+              {account.institution_name ? ` · ${account.institution_name}` : ""}
+            </p>
+          </div>
+          <div className="page-actions">
+            <Link href="/dashboard" className="btn btn-ghost" style={{ textDecoration: "none" }}>
+              Back
+            </Link>
+          </div>
         </div>
-        <div className="page-actions">
-          <Link href="/dashboard" className="btn btn-ghost" style={{ textDecoration: "none" }}>
-            Back
-          </Link>
+
+        {toast && <div className="toast">{toast}</div>}
+
+        <div className="hero-balance">
+          <div className="label">Balance</div>
+          <div className="amount">{formatMoney(account.balance, account.currency)}</div>
+          <div className="meta">{account.currency}</div>
         </div>
-      </div>
 
-      {toast && <div className="toast">{toast}</div>}
-
-      <div className="hero-balance">
-        <div className="label">Balance</div>
-        <div className="amount">{formatMoney(account.balance, account.currency)}</div>
-        <div className="meta">{account.currency}</div>
-      </div>
-
-      <div className="tile" style={{ maxWidth: 480, marginBottom: 24 }}>
-        <h2>Account details</h2>
-        <div className="field" style={{ marginTop: 12 }}>
-          <label htmlFor="nick">Nickname</label>
-          <input
-            id="nick"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            disabled={!canEdit}
-          />
+        <div className="tile" style={{ maxWidth: 480, marginBottom: 24 }}>
+          <h2>Account details</h2>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label htmlFor="nick">Nickname</label>
+            <input
+              id="nick"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="notes">Notes</label>
+            <input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+          <button type="button" className="btn btn-primary" onClick={save}>
+            Save
+          </button>
         </div>
-        <div className="field">
-          <label htmlFor="notes">Notes</label>
-          <input
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            disabled={!canEdit}
-          />
-        </div>
-        <button type="button" className="btn btn-primary" onClick={save}>
-          Save
-        </button>
-      </div>
 
-      <div className="section-title">Recent activity</div>
-      <div className="list-card">
-        {account.recent_transactions.map((t) => (
-          <div className="txn-row" key={t.id}>
-            <CategoryIcon name={t.category_name} />
-            <div className="txn-meta">
-              <div className="name">{t.display_name}</div>
-              <div className="sub">
-                {t.date}
-                {t.category_name ? ` · ${t.category_name}` : ""}
+        <div className="section-title">Recent activity</div>
+        <div className="list-card">
+          {account.recent_transactions.map((t) => (
+            <div className="txn-row" key={t.id}>
+              <CategoryIcon name={t.category_name} />
+              <div className="txn-meta">
+                <div className="name">{t.display_name}</div>
+                <div className="sub">
+                  {t.date}
+                  {t.category_name ? ` · ${t.category_name}` : ""}
+                </div>
+              </div>
+              <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
+                {formatMoney(t.amount, t.currency)}
               </div>
             </div>
-            <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
-              {formatMoney(t.amount, t.currency)}
-            </div>
-          </div>
-        ))}
-        {account.recent_transactions.length === 0 && (
-          <p style={{ padding: 24 }} className="muted">
-            No transactions on this account yet.
-          </p>
-        )}
-      </div>
+          ))}
+          {account.recent_transactions.length === 0 && (
+            <p style={{ padding: 24 }} className="muted">
+              No transactions on this account yet.
+            </p>
+          )}
+        </div>
+      </FadeIn>
     </AppShell>
   );
 }

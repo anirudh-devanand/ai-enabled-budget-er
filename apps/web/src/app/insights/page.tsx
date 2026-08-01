@@ -11,7 +11,9 @@ import type {
 import { CashFlowChart } from "@/components/charts/CashFlowChart";
 import { CategoryBars } from "@/components/charts/CategoryBars";
 import { chartColors } from "@/components/charts/chartTheme";
+import { FadeIn } from "@/components/MotionEnter";
 import { Segmented } from "@/components/Segmented";
+import { InsightsSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
@@ -30,6 +32,7 @@ export default function InsightsPage() {
   const [spending, setSpending] = useState<NamedAmount[]>([]);
   const [income, setIncome] = useState<NamedAmount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const colors = chartColors();
 
   const load = useCallback(async () => {
@@ -38,6 +41,7 @@ export default function InsightsPage() {
     setHouseholdId(hid);
     if (!hid) {
       setLoading(false);
+      setHasLoaded(true);
       return;
     }
     setLoading(true);
@@ -56,14 +60,21 @@ export default function InsightsPage() {
       setIncome(inc);
     } finally {
       setLoading(false);
+      setHasLoaded(true);
     }
   }, [days]);
 
   useEffect(() => {
     load().catch((err) => {
       if (isUnauthorized(err)) router.replace("/login");
+      else {
+        setLoading(false);
+        setHasLoaded(true);
+      }
     });
   }, [load, router]);
+
+  const showSkeleton = loading && !hasLoaded;
 
   return (
     <AppShell householdId={householdId} onRefresh={load}>
@@ -84,67 +95,75 @@ export default function InsightsPage() {
         />
       </div>
 
-      <div className="insight-summary">
-        <div className="insight-stat">
-          <div className="label">Income</div>
-          <div className="amount positive">
-            {summary ? formatMoney(summary.income_total, summary.currency) : "—"}
-          </div>
-        </div>
-        <div className="insight-stat">
-          <div className="label">Spending</div>
-          <div className="amount">
-            {summary ? formatMoney(summary.spending_total, summary.currency) : "—"}
-          </div>
-        </div>
-        <div className="insight-stat">
-          <div className="label">Net</div>
-          <div className="amount">
-            {summary ? formatMoney(summary.net, summary.currency) : "—"}
-          </div>
-        </div>
-        <div className="insight-stat">
-          <div className="label">Net worth</div>
-          <div className="amount">
-            {netWorth ? formatMoney(netWorth.total, netWorth.currency) : "—"}
-          </div>
-        </div>
-      </div>
+      {showSkeleton ? (
+        <InsightsSkeleton />
+      ) : (
+        loading && hasLoaded ? (
+          <InsightsSkeleton />
+        ) : (
+          <FadeIn key={days}>
+            <div className="insight-summary">
+              <div className="insight-stat">
+                <div className="label">Income</div>
+                <div className="amount positive">
+                  {summary ? formatMoney(summary.income_total, summary.currency) : "—"}
+                </div>
+              </div>
+              <div className="insight-stat">
+                <div className="label">Spending</div>
+                <div className="amount">
+                  {summary ? formatMoney(summary.spending_total, summary.currency) : "—"}
+                </div>
+              </div>
+              <div className="insight-stat">
+                <div className="label">Net</div>
+                <div className="amount">
+                  {summary ? formatMoney(summary.net, summary.currency) : "—"}
+                </div>
+              </div>
+              <div className="insight-stat">
+                <div className="label">Net worth</div>
+                <div className="amount">
+                  {netWorth ? formatMoney(netWorth.total, netWorth.currency) : "—"}
+                </div>
+              </div>
+            </div>
 
-      {loading && <p className="muted">Updating charts…</p>}
+            <div className="tile chart-tile">
+              <h2>Cash flow</h2>
+              <p className="muted" style={{ marginTop: 6 }}>
+                Income vs spending over the last {days} days.
+              </p>
+              <CashFlowChart data={cashFlow} />
+            </div>
 
-      <div className="tile chart-tile">
-        <h2>Cash flow</h2>
-        <p className="muted" style={{ marginTop: 6 }}>
-          Income vs spending over the last {days} days.
-        </p>
-        <CashFlowChart data={cashFlow} />
-      </div>
-
-      <div className="insight-split">
-        <div className="tile chart-tile">
-          <h2>Spending by category</h2>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Where money went this period.
-          </p>
-          <CategoryBars
-            data={spending}
-            color={colors.spending}
-            emptyLabel="No categorized spending yet — link a bank or wait for sync."
-          />
-        </div>
-        <div className="tile chart-tile">
-          <h2>Income by category</h2>
-          <p className="muted" style={{ marginTop: 6 }}>
-            Paycheques, transfers, and other inflows.
-          </p>
-          <CategoryBars
-            data={income}
-            color={colors.income}
-            emptyLabel="No categorized income yet."
-          />
-        </div>
-      </div>
+            <div className="insight-split">
+              <div className="tile chart-tile">
+                <h2>Spending by category</h2>
+                <p className="muted" style={{ marginTop: 6 }}>
+                  Where money went this period.
+                </p>
+                <CategoryBars
+                  data={spending}
+                  color={colors.spending}
+                  emptyLabel="No categorized spending yet — link a bank or wait for sync."
+                />
+              </div>
+              <div className="tile chart-tile">
+                <h2>Income by category</h2>
+                <p className="muted" style={{ marginTop: 6 }}>
+                  Paycheques, transfers, and other inflows.
+                </p>
+                <CategoryBars
+                  data={income}
+                  color={colors.income}
+                  emptyLabel="No categorized income yet."
+                />
+              </div>
+            </div>
+          </FadeIn>
+        )
+      )}
     </AppShell>
   );
 }

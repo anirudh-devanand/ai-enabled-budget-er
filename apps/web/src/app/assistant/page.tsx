@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { MessageResponse } from "@woney/api-client";
+import { FadeIn } from "@/components/MotionEnter";
+import { AssistantSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getApiDetail, isUnauthorized } from "@/lib/errors";
@@ -83,69 +85,70 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      <div className="list-card" style={{ minHeight: 360, padding: 20 }}>
-        {!ready && (
-          <p className="muted" style={{ margin: 0 }}>
-            Starting chat…
-          </p>
-        )}
-        {ready && messages.length === 0 && !error && (
-          <p className="muted" style={{ margin: 0 }}>
-            Try “How much did I spend on dining?” or “Am I on track this month?”
-          </p>
-        )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              marginBottom: 16,
-              maxWidth: "85%",
-              marginLeft: m.role === "user" ? "auto" : 0,
-              background: m.role === "user" ? "var(--accent-soft)" : "var(--surface-muted)",
-              borderRadius: 16,
-              padding: "12px 14px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                color: "var(--muted)",
-                marginBottom: 4,
-              }}
-            >
-              {m.role === "user" ? "You" : "Woney"}
-            </div>
-            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{m.content}</p>
+      {!ready ? (
+        <AssistantSkeleton />
+      ) : (
+        <FadeIn>
+          <div className="list-card" style={{ minHeight: 360, padding: 20 }}>
+            {messages.length === 0 && !error && (
+              <p className="muted" style={{ margin: 0 }}>
+                Try “How much did I spend on dining?” or “Am I on track this month?”
+              </p>
+            )}
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  marginBottom: 16,
+                  maxWidth: "85%",
+                  marginLeft: m.role === "user" ? "auto" : 0,
+                  background: m.role === "user" ? "var(--accent-soft)" : "var(--surface-muted)",
+                  borderRadius: 16,
+                  padding: "12px 14px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {m.role === "user" ? "You" : "Woney"}
+                </div>
+                <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{m.content}</p>
+              </div>
+            ))}
+            {error && (
+              <p className="error" style={{ marginTop: messages.length ? 8 : 0 }}>
+                {error}
+              </p>
+            )}
           </div>
-        ))}
-        {error && (
-          <p className="error" style={{ marginTop: messages.length ? 8 : 0 }}>
-            {error}
-          </p>
-        )}
-      </div>
 
-      <div className="assistant-composer" style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <input
-          className="assistant-input"
-          style={{ flex: 1 }}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          placeholder="Ask Woney…"
-          aria-label="Message"
-          disabled={busy || !conversationId}
-        />
-        <button type="button" className="btn btn-primary" onClick={() => void send()} disabled={!canSend}>
-          {busy ? "…" : "Send"}
-        </button>
-      </div>
+          <div className="assistant-composer" style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <input
+              className="assistant-input"
+              style={{ flex: 1 }}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder="Ask Woney…"
+              aria-label="Message"
+              disabled={busy || !conversationId}
+            />
+            <button type="button" className="btn btn-primary" onClick={() => void send()} disabled={!canSend}>
+              {busy ? "…" : "Send"}
+            </button>
+          </div>
+        </FadeIn>
+      )}
     </AppShell>
   );
 }

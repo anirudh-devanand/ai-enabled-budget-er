@@ -7,6 +7,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } fr
 import { ApiError } from "@woney/api-client";
 import { AnimatedToast } from "@/components/AnimatedToast";
 import { Segmented } from "@/components/Segmented";
+import { ConnectCardSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 
@@ -261,6 +262,17 @@ function ConnectInner() {
 
         <AnimatePresence mode="wait" initial={false}>
           {tab === "plaid" ? (
+            mfaEnabled === null && status === "idle" ? (
+              <motion.div
+                key="plaid-sk"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+              >
+                <ConnectCardSkeleton />
+              </motion.div>
+            ) : (
             <motion.section
               key="plaid"
               className="card connect-card"
@@ -303,9 +315,21 @@ function ConnectInner() {
                 </p>
               )}
             </motion.section>
+            )
           ) : null}
 
           {tab === "csv" ? (
+            mfaEnabled === null ? (
+              <motion.div
+                key="csv-sk"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+              >
+                <ConnectCardSkeleton />
+              </motion.div>
+            ) : (
             <motion.section
               key="csv"
               className="card connect-card"
@@ -374,9 +398,21 @@ function ConnectInner() {
                 </form>
               )}
             </motion.section>
+            )
           ) : null}
 
           {tab === "demo" ? (
+            mfaEnabled === null ? (
+              <motion.div
+                key="demo-sk"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+              >
+                <ConnectCardSkeleton />
+              </motion.div>
+            ) : (
             <motion.section
               key="demo"
               className="card connect-card"
@@ -410,6 +446,7 @@ function ConnectInner() {
                 </button>
               )}
             </motion.section>
+            )
           ) : null}
         </AnimatePresence>
       </div>

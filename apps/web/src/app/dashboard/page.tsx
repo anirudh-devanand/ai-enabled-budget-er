@@ -11,8 +11,9 @@ import type {
 } from "@woney/api-client";
 import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { BankLogo } from "@/components/BankLogo";
+import { FadeIn, Stagger, StaggerItem } from "@/components/MotionEnter";
+import { DashboardSkeleton } from "@/components/Skeleton";
 import { AppShell, CategoryIcon } from "@/components/ui";
-import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
@@ -50,9 +51,9 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <div className="app-main">
-        <WoneyLoader label="Loading your accounts…" />
-      </div>
+      <AppShell onRefresh={load}>
+        <DashboardSkeleton />
+      </AppShell>
     );
   }
 
@@ -60,27 +61,29 @@ export default function DashboardPage() {
 
   return (
     <AppShell householdId={household?.id} onRefresh={load}>
-      <div className="page-header">
-        <div>
-          <h1>Hello, {user.display_name.split(" ")[0]}</h1>
-          <p>Here’s where your money stands today.</p>
+      <FadeIn>
+        <div className="page-header">
+          <div>
+            <h1>Hello, {user.display_name.split(" ")[0]}</h1>
+            <p>Here’s where your money stands today.</p>
+          </div>
         </div>
-      </div>
 
-      <div className="hero-balance">
-        <div className="label">Total balance</div>
-        <AnimatedBalance
-          className="amount"
-          value={netBalance}
-          currency={accounts[0]?.currency ?? "CAD"}
-        />
-        <div className="meta">
-          {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
+        <div className="hero-balance">
+          <div className="label">Total balance</div>
+          <AnimatedBalance
+            className="amount"
+            value={netBalance}
+            currency={accounts[0]?.currency ?? "CAD"}
+          />
+          <div className="meta">
+            {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
+          </div>
         </div>
-      </div>
+      </FadeIn>
 
       {goals.length > 0 && (
-        <>
+        <FadeIn delay={0.04}>
           <div className="section-title" style={{ display: "flex", justifyContent: "space-between" }}>
             <span>Goals</span>
             <button
@@ -115,43 +118,47 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-        </>
+        </FadeIn>
       )}
 
-      <div className="grid">
+      <Stagger className="grid" delay={0.06}>
         {accounts.map((a) => (
-          <button
-            type="button"
-            className="account-card"
-            key={a.id}
-            onClick={() => router.push(`/accounts/${a.id}`)}
-          >
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 4 }}>
-              <BankLogo institutionName={a.institution_name || a.name} size={40} />
-              <p className="label" style={{ margin: 0 }}>
-                {a.display_name || a.name}
-                {a.masked_number ? ` ····${a.masked_number}` : ""}
+          <StaggerItem key={a.id}>
+            <button
+              type="button"
+              className="account-card"
+              onClick={() => router.push(`/accounts/${a.id}`)}
+              style={{ width: "100%" }}
+            >
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 4 }}>
+                <BankLogo institutionName={a.institution_name || a.name} size={40} />
+                <p className="label" style={{ margin: 0 }}>
+                  {a.display_name || a.name}
+                  {a.masked_number ? ` ····${a.masked_number}` : ""}
+                </p>
+              </div>
+              <p className="amount">{formatMoney(a.balance, a.currency)}</p>
+              <p className="meta">
+                {a.type}
+                {a.institution_name ? ` · ${a.institution_name}` : ""}
               </p>
-            </div>
-            <p className="amount">{formatMoney(a.balance, a.currency)}</p>
-            <p className="meta">
-              {a.type}
-              {a.institution_name ? ` · ${a.institution_name}` : ""}
-            </p>
-          </button>
+            </button>
+          </StaggerItem>
         ))}
         {accounts.length === 0 && household && (
-          <div className="account-card">
-            <p className="label">{household.name}</p>
-            <p className="meta" style={{ marginTop: 12 }}>
-              Link a bank in Account to see live balances.
-            </p>
-          </div>
+          <StaggerItem>
+            <div className="account-card">
+              <p className="label">{household.name}</p>
+              <p className="meta" style={{ marginTop: 12 }}>
+                Link a bank in Account to see live balances.
+              </p>
+            </div>
+          </StaggerItem>
         )}
-      </div>
+      </Stagger>
 
       {transactions.length > 0 && (
-        <>
+        <FadeIn delay={0.1}>
           <div className="section-title">Recent activity</div>
           <div className="list-card">
             {transactions.map((t) => (
@@ -171,7 +178,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </>
+        </FadeIn>
       )}
     </AppShell>
   );

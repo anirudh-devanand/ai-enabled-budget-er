@@ -9,6 +9,8 @@ import type {
   TransactionResponse,
 } from "@woney/api-client";
 import { AnimatedToast } from "@/components/AnimatedToast";
+import { FadeIn } from "@/components/MotionEnter";
+import { TransactionsSkeleton } from "@/components/Skeleton";
 import { AppShell, CategoryIcon, FilterBar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
@@ -101,19 +103,26 @@ export default function TransactionsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [reviewOnly, setReviewOnly] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
 
   const load = useCallback(
     async (hid: string) => {
-      const result = await api.listTransactions(hid, {
-        limit: 100,
-        q: q || undefined,
-        accountId: accountId || undefined,
-        categoryId: categoryId || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        needsReview: reviewOnly ? true : undefined,
-      });
-      setTransactions(result.items);
+      setListLoading(true);
+      try {
+        const result = await api.listTransactions(hid, {
+          limit: 100,
+          q: q || undefined,
+          accountId: accountId || undefined,
+          categoryId: categoryId || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          needsReview: reviewOnly ? true : undefined,
+        });
+        setTransactions(result.items);
+      } finally {
+        setListLoading(false);
+      }
     },
     [q, accountId, categoryId, dateFrom, dateTo, reviewOnly],
   );
@@ -124,7 +133,10 @@ export default function TransactionsPage() {
         const households = await api.listHouseholds();
         const hid = households[0]?.id ?? null;
         setHouseholdId(hid);
-        if (!hid) return;
+        if (!hid) {
+          setReady(true);
+          return;
+        }
         const [cats, accs] = await Promise.all([
           api.listCategories(hid),
           api.listAccounts(hid),
@@ -132,8 +144,10 @@ export default function TransactionsPage() {
         setCategories(cats);
         setAccounts(accs);
         await load(hid);
+        setReady(true);
       } catch (err) {
         if (isUnauthorized(err)) router.replace("/login");
+        else setReady(true);
       }
     })();
   }, [router, load]);
@@ -201,73 +215,79 @@ export default function TransactionsPage() {
 
       <AnimatedToast message={toast} />
 
-      <div className="list-card">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {transactions.map((t) => {
-            const pref = t.category_id ? catMap[t.category_id] : undefined;
-            return (
-              <motion.div
-                key={t.id}
-                layout={!reduceMotion}
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                transition={{ duration: reduceMotion ? 0 : 0.2, ease: ROW_EASE }}
-                style={{ borderBottom: "1px solid var(--border)" }}
-              >
-                <div className="txn-row" style={{ borderBottom: "none" }}>
-                  <CategoryIcon name={t.category_name} pref={pref} />
-                  <div className="txn-meta">
-                    <div className="name">{t.display_name}</div>
-                    <div className="sub">
-                      {t.date}
-                      {t.category_name ? ` · ${t.category_name}` : ""}
-                      {t.needs_review ? " · needs review" : ""}
-                      <button
-                        type="button"
-                        onClick={() => setEditing(editing === t.id ? null : t.id)}
-                        style={{
-                          marginLeft: 8,
-                          background: "none",
-                          border: "none",
-                          color: "var(--accent)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          padding: 0,
-                        }}
-                      >
-                        {editing === t.id ? "Cancel" : "Edit type"}
-                      </button>
+      {!ready || (listLoading && transactions.length === 0) ? (
+        <TransactionsSkeleton />
+      ) : (
+        <FadeIn key={`${accountId}-${categoryId}-${dateFrom}-${dateTo}-${reviewOnly}-${q}`}>
+          <div className="list-card">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {transactions.map((t) => {
+                const pref = t.category_id ? catMap[t.category_id] : undefined;
+                return (
+                  <motion.div
+                    key={t.id}
+                    layout={!reduceMotion}
+                    initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.2, ease: ROW_EASE }}
+                    style={{ borderBottom: "1px solid var(--border)" }}
+                  >
+                    <div className="txn-row" style={{ borderBottom: "none" }}>
+                      <CategoryIcon name={t.category_name} pref={pref} />
+                      <div className="txn-meta">
+                        <div className="name">{t.display_name}</div>
+                        <div className="sub">
+                          {t.date}
+                          {t.category_name ? ` · ${t.category_name}` : ""}
+                          {t.needs_review ? " · needs review" : ""}
+                          <button
+                            type="button"
+                            onClick={() => setEditing(editing === t.id ? null : t.id)}
+                            style={{
+                              marginLeft: 8,
+                              background: "none",
+                              border: "none",
+                              color: "var(--accent)",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              padding: 0,
+                            }}
+                          >
+                            {editing === t.id ? "Cancel" : "Edit type"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
+                        {formatMoney(t.amount, t.currency)}
+                      </div>
                     </div>
-                  </div>
-                  <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
-                    {formatMoney(t.amount, t.currency)}
-                  </div>
-                </div>
-                {editing === t.id && (
-                  <div style={{ padding: "0 16px 16px 74px" }}>
-                    <CorrectionForm
-                      transaction={t}
-                      categories={categories}
-                      onDone={async (message) => {
-                        setEditing(null);
-                        setToast(message);
-                        if (householdId) await load(householdId);
-                        setTimeout(() => setToast(null), 4000);
-                      }}
-                    />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-        {transactions.length === 0 && (
-          <p style={{ padding: 24 }} className="muted">
-            No transactions match these filters.
-          </p>
-        )}
-      </div>
+                    {editing === t.id && (
+                      <div style={{ padding: "0 16px 16px 74px" }}>
+                        <CorrectionForm
+                          transaction={t}
+                          categories={categories}
+                          onDone={async (message) => {
+                            setEditing(null);
+                            setToast(message);
+                            if (householdId) await load(householdId);
+                            setTimeout(() => setToast(null), 4000);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+            {transactions.length === 0 && (
+              <p style={{ padding: 24 }} className="muted">
+                No transactions match these filters.
+              </p>
+            )}
+          </div>
+        </FadeIn>
+      )}
     </AppShell>
   );
 }

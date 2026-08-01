@@ -12,8 +12,9 @@ import type {
 } from "@woney/api-client";
 import { BankLogo } from "@/components/BankLogo";
 import { CategoryGlyph } from "@/components/CategoryIcon";
+import { FadeIn } from "@/components/MotionEnter";
+import { AccountSkeleton } from "@/components/Skeleton";
 import { CategoryIcon, AppShell } from "@/components/ui";
-import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { promptBankReauth } from "@/lib/bankSync";
 import { getApiDetail, isUnauthorized, parseItemLoginRequired } from "@/lib/errors";
@@ -309,9 +310,9 @@ export default function AccountPage() {
 
   if (!user) {
     return (
-      <div className="app-main">
-        <WoneyLoader label="Loading account…" />
-      </div>
+      <AppShell onRefresh={load}>
+        <AccountSkeleton />
+      </AppShell>
     );
   }
 
@@ -325,6 +326,7 @@ export default function AccountPage() {
 
   return (
     <AppShell householdId={householdId} onRefresh={load}>
+      <FadeIn>
       <div className="page-header">
         <div>
           <h1>Account</h1>
@@ -753,6 +755,7 @@ export default function AccountPage() {
           </div>
         )}
       </section>
+      </FadeIn>
     </AppShell>
   );
 }
