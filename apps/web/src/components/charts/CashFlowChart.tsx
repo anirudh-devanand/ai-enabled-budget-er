@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import {
   Area,
   AreaChart,
@@ -13,6 +14,8 @@ import {
 import type { CashFlowPoint } from "@woney/api-client";
 import { formatMoney } from "@/lib/ui";
 import { chartColors } from "./chartTheme";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 function rollupWeekly(points: CashFlowPoint[]) {
   if (points.length <= 45) {
@@ -43,13 +46,22 @@ function rollupWeekly(points: CashFlowPoint[]) {
 }
 
 export function CashFlowChart({ data }: { data: CashFlowPoint[] }) {
+  const reduce = useReducedMotion();
   const colors = chartColors();
   const rows = rollupWeekly(data);
   if (rows.length === 0) {
     return <p className="muted">No cash-flow data for this period yet.</p>;
   }
+  const chartKey = `${rows[0]?.label ?? ""}-${rows[rows.length - 1]?.label ?? ""}-${rows.length}`;
+
   return (
-    <div className="chart-frame">
+    <motion.div
+      key={chartKey}
+      className="chart-frame"
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
+    >
       <ResponsiveContainer width="100%" height={280}>
         <AreaChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={colors.grid} vertical={false} />
@@ -84,6 +96,8 @@ export function CashFlowChart({ data }: { data: CashFlowPoint[] }) {
             fill={colors.income}
             fillOpacity={0.25}
             strokeWidth={2}
+            isAnimationActive={!reduce}
+            animationDuration={reduce ? 0 : 700}
           />
           <Area
             type="monotone"
@@ -93,9 +107,11 @@ export function CashFlowChart({ data }: { data: CashFlowPoint[] }) {
             fill={colors.spending}
             fillOpacity={0.25}
             strokeWidth={2}
+            isAnimationActive={!reduce}
+            animationDuration={reduce ? 0 : 700}
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </motion.div>
   );
 }

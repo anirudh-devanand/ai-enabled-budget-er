@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import type {
   CategoryResponse,
@@ -16,6 +17,8 @@ import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { promptBankReauth } from "@/lib/bankSync";
 import { getApiDetail, isUnauthorized, parseItemLoginRequired } from "@/lib/errors";
+
+const PILL_EASE = [0.22, 1, 0.36, 1] as const;
 
 function formatSynced(iso: string | null | undefined) {
   if (!iso) return "Never synced";
@@ -34,6 +37,7 @@ type DeleteStep = "idle" | "confirm";
 
 export default function AccountPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [user, setUser] = useState<UserResponse | null>(null);
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -517,9 +521,15 @@ export default function AccountPage() {
             <div className="bank-row-meta">
               <div className="name">{c.institution_name || `${c.provider} connection`}</div>
               <div className="sub">
-                <span className={`status-pill${c.status === "error" ? " status-pill--error" : ""}`}>
+                <motion.span
+                  key={`${c.id}-${c.status}`}
+                  className={`status-pill${c.status === "error" ? " status-pill--error" : ""}`}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.22, ease: PILL_EASE }}
+                >
                   {c.status}
-                </span>
+                </motion.span>
                 <span>{formatSynced(c.last_synced_at)}</span>
                 <span style={{ textTransform: "capitalize" }}>{c.provider}</span>
               </div>

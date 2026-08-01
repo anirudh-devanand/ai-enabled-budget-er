@@ -11,17 +11,19 @@ import type {
 import { CashFlowChart } from "@/components/charts/CashFlowChart";
 import { CategoryBars } from "@/components/charts/CategoryBars";
 import { chartColors } from "@/components/charts/chartTheme";
+import { Segmented } from "@/components/Segmented";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
 
 const RANGES = [30, 90, 365] as const;
+type RangeDays = (typeof RANGES)[number];
 
 export default function InsightsPage() {
   const router = useRouter();
   const [householdId, setHouseholdId] = useState<string | null>(null);
-  const [days, setDays] = useState<(typeof RANGES)[number]>(30);
+  const [days, setDays] = useState<RangeDays>(30);
   const [netWorth, setNetWorth] = useState<NetWorthResponse | null>(null);
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
   const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
@@ -70,18 +72,16 @@ export default function InsightsPage() {
           <h1>Insights</h1>
           <p>Numbers from your linked accounts — Woney never invents the math.</p>
         </div>
-        <div className="segmented" role="tablist" aria-label="Period">
-          {RANGES.map((d) => (
-            <button
-              key={d}
-              type="button"
-              className={days === d ? "active" : undefined}
-              onClick={() => setDays(d)}
-            >
-              {d === 365 ? "1y" : `${d}d`}
-            </button>
-          ))}
-        </div>
+        <Segmented<`${RangeDays}`>
+          aria-label="Period"
+          layoutId="insights-period-pill"
+          value={`${days}`}
+          onChange={(v) => setDays(Number(v) as RangeDays)}
+          options={RANGES.map((d) => ({
+            value: `${d}` as `${RangeDays}`,
+            label: d === 365 ? "1y" : `${d}d`,
+          }))}
+        />
       </div>
 
       <div className="insight-summary">

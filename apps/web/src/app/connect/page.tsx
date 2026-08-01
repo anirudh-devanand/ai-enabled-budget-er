@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@woney/api-client";
+import { AnimatedToast } from "@/components/AnimatedToast";
+import { Segmented } from "@/components/Segmented";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 type Tab = "plaid" | "csv" | "demo";
 type Status = "idle" | "ready" | "syncing" | "error";
@@ -62,6 +67,7 @@ function formatPlaidStartError(err: unknown): string {
 function ConnectInner() {
   const router = useRouter();
   const params = useSearchParams();
+  const reduceMotion = useReducedMotion();
   const householdId = params.get("household");
   const reconnectId = params.get("reconnect");
   const [tab, setTab] = useState<Tab>("plaid");
@@ -218,131 +224,194 @@ function ConnectInner() {
       </div>
 
       <div className="connect-flow">
-        <div className="segmented" role="tablist" aria-label="Connection method">
-          <button type="button" className={`seg-btn${tab === "plaid" ? " active" : ""}`} onClick={() => setTab("plaid")}>
-            Plaid Link
-          </button>
-          <button type="button" className={`seg-btn${tab === "csv" ? " active" : ""}`} onClick={() => setTab("csv")}>
-            CSV import
-          </button>
-          <button type="button" className={`seg-btn${tab === "demo" ? " active" : ""}`} onClick={() => setTab("demo")}>
-            Demo data
-          </button>
-        </div>
+        <Segmented
+          aria-label="Connection method"
+          layoutId="connect-method-pill"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "plaid", label: "Plaid Link" },
+            { value: "csv", label: "CSV import" },
+            { value: "demo", label: "Demo data" },
+          ]}
+        />
 
-        {status === "syncing" && (
-          <div className="toast">Pulling accounts and transactions — this can take a minute…</div>
-        )}
-        {status === "error" && error && <p className="error">{error}</p>}
+        <AnimatedToast
+          message={
+            status === "syncing"
+              ? "Pulling accounts and transactions — this can take a minute…"
+              : null
+          }
+        />
+        <AnimatePresence>
+          {status === "error" && error ? (
+            <motion.p
+              key="connect-error"
+              className="error"
+              role="alert"
+              initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.2, ease: EASE }}
+            >
+              {error}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
 
-        {tab === "plaid" && (
-          <section className="card connect-card">
-            <h2>Secure bank link</h2>
-            <p className="sub">
-              Works with major Canadian banks via Plaid. Woney never sees your bank password.
-              Neo is usually not on Plaid — use CSV import for that.
-            </p>
-            {mfaEnabled === false ? (
-              <div>
-                <p className="error" style={{ marginTop: 0 }}>
-                  Enable multi-factor authentication before linking a live bank.
-                </p>
-                <Link href="/account#security" className="btn btn-primary">
-                  Open Account security
-                </Link>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!linkToken || status === "syncing"}
-                onClick={openPlaid}
-              >
-                {linkToken ? (updateMode ? "Reconnect with Plaid" : "Open Plaid Link") : "Preparing Link…"}
-              </button>
-            )}
-            {updateMode && (
-              <p className="muted" style={{ marginTop: 12 }}>
-                This updates your existing connection — it won’t create a duplicate bank link.
+        <AnimatePresence mode="wait" initial={false}>
+          {tab === "plaid" ? (
+            <motion.section
+              key="plaid"
+              className="card connect-card"
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+            >
+              <h2>Secure bank link</h2>
+              <p className="sub">
+                Works with major Canadian banks via Plaid. Woney never sees your bank password.
+                Neo is usually not on Plaid — use CSV import for that.
               </p>
-            )}
-          </section>
-        )}
-
-        {tab === "csv" && (
-          <section className="card connect-card">
-            <h2>Import a statement</h2>
-            <p className="sub">
-              Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are detected
-              automatically from common Canadian export formats. Two-factor authentication is required.
-            </p>
-            {mfaEnabled === false ? (
-              <div>
-                <p className="error" style={{ marginTop: 0 }}>
-                  Enable multi-factor authentication before importing statements.
+              {mfaEnabled === false ? (
+                <div>
+                  <p className="error" style={{ marginTop: 0 }}>
+                    Enable multi-factor authentication before linking a live bank.
+                  </p>
+                  <Link href="/account#security" className="btn btn-primary">
+                    Open Account security
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!linkToken || status === "syncing"}
+                  onClick={openPlaid}
+                >
+                  {linkToken
+                    ? updateMode
+                      ? "Reconnect with Plaid"
+                      : "Open Plaid Link"
+                    : "Preparing Link…"}
+                </button>
+              )}
+              {updateMode && (
+                <p className="muted" style={{ marginTop: 12 }}>
+                  This updates your existing connection — it won’t create a duplicate bank link.
                 </p>
-                <Link href="/account" className="btn btn-primary">
-                  Open Account security
-                </Link>
-              </div>
-            ) : (
-            <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
-              <label>
-                Institution
-                <input value={institutionName} onChange={(e) => setInstitutionName(e.target.value)} required />
-              </label>
-              <label>
-                Account name
-                <input value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
-              </label>
-              <label>
-                Account type
-                <select value={accountType} onChange={(e) => setAccountType(e.target.value)}>
-                  <option value="chequing">Chequing</option>
-                  <option value="savings">Savings</option>
-                  <option value="credit">Credit</option>
-                </select>
-              </label>
-              <label>
-                CSV file
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  required
-                />
-              </label>
-              <button type="submit" className="btn btn-primary" disabled={!file || status === "syncing"}>
-                Import statement
-              </button>
-            </form>
-            )}
-          </section>
-        )}
+              )}
+            </motion.section>
+          ) : null}
 
-        {tab === "demo" && (
-          <section className="card connect-card">
-            <h2>Demo Scotiabank history</h2>
-            <p className="sub">
-              Seeds synthetic CAD accounts and ~180 days of transactions for QA. Two-factor
-              authentication is required.
-            </p>
-            {mfaEnabled === false ? (
-              <div>
-                <p className="error" style={{ marginTop: 0 }}>
-                  Enable multi-factor authentication before loading demo data.
-                </p>
-                <Link href="/account" className="btn btn-primary">
-                  Open Account security
-                </Link>
-              </div>
-            ) : (
-              <button type="button" className="btn btn-primary" disabled={status === "syncing"} onClick={onDemo}>
-                Load demo data
-              </button>
-            )}
-          </section>
-        )}
+          {tab === "csv" ? (
+            <motion.section
+              key="csv"
+              className="card connect-card"
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+            >
+              <h2>Import a statement</h2>
+              <p className="sub">
+                Download a CSV from Neo (or any bank), then upload it here. Dates and amounts are
+                detected automatically from common Canadian export formats. Two-factor authentication
+                is required.
+              </p>
+              {mfaEnabled === false ? (
+                <div>
+                  <p className="error" style={{ marginTop: 0 }}>
+                    Enable multi-factor authentication before importing statements.
+                  </p>
+                  <Link href="/account" className="btn btn-primary">
+                    Open Account security
+                  </Link>
+                </div>
+              ) : (
+                <form onSubmit={onCsvSubmit} className="stack" style={{ gap: 14 }}>
+                  <label>
+                    Institution
+                    <input
+                      value={institutionName}
+                      onChange={(e) => setInstitutionName(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Account name
+                    <input
+                      value={accountName}
+                      onChange={(e) => setAccountName(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Account type
+                    <select value={accountType} onChange={(e) => setAccountType(e.target.value)}>
+                      <option value="chequing">Chequing</option>
+                      <option value="savings">Savings</option>
+                      <option value="credit">Credit</option>
+                    </select>
+                  </label>
+                  <label>
+                    CSV file
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                      required
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={!file || status === "syncing"}
+                  >
+                    Import statement
+                  </button>
+                </form>
+              )}
+            </motion.section>
+          ) : null}
+
+          {tab === "demo" ? (
+            <motion.section
+              key="demo"
+              className="card connect-card"
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+            >
+              <h2>Demo Scotiabank history</h2>
+              <p className="sub">
+                Seeds synthetic CAD accounts and ~180 days of transactions for QA. Two-factor
+                authentication is required.
+              </p>
+              {mfaEnabled === false ? (
+                <div>
+                  <p className="error" style={{ marginTop: 0 }}>
+                    Enable multi-factor authentication before loading demo data.
+                  </p>
+                  <Link href="/account" className="btn btn-primary">
+                    Open Account security
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={status === "syncing"}
+                  onClick={onDemo}
+                >
+                  Load demo data
+                </button>
+              )}
+            </motion.section>
+          ) : null}
+        </AnimatePresence>
       </div>
     </AppShell>
   );

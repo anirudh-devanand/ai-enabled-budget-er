@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { AnimatedToast } from "@/components/AnimatedToast";
 import { BankReauthPrompt } from "@/components/BankReauthPrompt";
@@ -17,6 +18,8 @@ import {
 import { passwordScore } from "@/lib/ui";
 
 export { CategoryIcon };
+
+const PAGE_EASE = [0.22, 1, 0.36, 1] as const;
 
 const LINKS = [
   { href: "/dashboard", label: "Home" },
@@ -40,6 +43,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
@@ -118,15 +122,26 @@ export function AppShell({
           Woney
         </Link>
         <nav>
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`nav-link${pathname === l.href || pathname?.startsWith(l.href + "/") ? " active" : ""}`}
-            >
-              {l.label}
-            </Link>
-          ))}
+          {LINKS.map((l) => {
+            const active =
+              pathname === l.href || Boolean(pathname?.startsWith(l.href + "/"));
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`nav-link${active ? " active" : ""}${active && !reduceMotion ? " has-motion-indicator" : ""}`}
+              >
+                {active && !reduceMotion ? (
+                  <motion.span
+                    layoutId="app-nav-active"
+                    className="nav-active-indicator"
+                    transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                  />
+                ) : null}
+                <span className="nav-link-label">{l.label}</span>
+              </Link>
+            );
+          })}
         </nav>
         <div className="nav-footer">
           <ThemeToggle />
@@ -155,7 +170,15 @@ export function AppShell({
           </div>
         )}
         <AnimatedToast message={toast} className="app-chrome-toast" />
-        {children}
+        <motion.div
+          key={pathname}
+          className="app-page"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2, ease: PAGE_EASE }}
+        >
+          {children}
+        </motion.div>
       </div>
       <BankReauthPrompt targets={reauthRequired} />
     </div>

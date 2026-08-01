@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import type { ReactNode } from "react";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const HERO_TXNS = [
   { name: "Loblaws", cat: "Groceries", amount: "−$64.20", tone: "out" },
@@ -111,38 +114,36 @@ function BankSyncScene() {
   );
 }
 
-export function Landing() {
-  const rootRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      root.querySelectorAll("[data-reveal]").forEach((el) => el.classList.add("is-visible"));
-      return;
-    }
-
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            io.unobserve(entry.target);
-          }
-        }
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.18 },
-    );
-
-    nodes.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+function Reveal({
+  as: Tag = "section",
+  className,
+  children,
+  delay = 0,
+}: {
+  as?: "section" | "div";
+  className?: string;
+  children: ReactNode;
+  delay?: number;
+}) {
+  const reduce = useReducedMotion();
+  const MotionTag = Tag === "div" ? motion.div : motion.section;
 
   return (
-    <main ref={rootRef} className="landing">
+    <MotionTag
+      className={className}
+      initial={reduce ? false : { opacity: 0, y: 22 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.18, margin: "0px 0px -8% 0px" }}
+      transition={{ duration: reduce ? 0 : 0.85, ease: EASE, delay: reduce ? 0 : delay }}
+    >
+      {children}
+    </MotionTag>
+  );
+}
+
+export function Landing() {
+  return (
+    <main className="landing">
       <header className="landing-nav">
         <Link href="/" className="landing-nav-brand" aria-label="Woney home">
           Woney
@@ -176,7 +177,7 @@ export function Landing() {
         <HeroScene />
       </section>
 
-      <section className="landing-block" data-reveal>
+      <Reveal className="landing-block">
         <div className="landing-section-glow" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Bank sync</p>
@@ -186,12 +187,12 @@ export function Landing() {
             the full picture without spreadsheet chaos.
           </p>
         </div>
-        <div className="landing-block-visual landing-block-visual-soft" data-reveal>
+        <Reveal as="div" className="landing-block-visual landing-block-visual-soft" delay={0.08}>
           <BankSyncScene />
-        </div>
-      </section>
+        </Reveal>
+      </Reveal>
 
-      <section className="landing-block landing-block-flip" data-reveal>
+      <Reveal className="landing-block landing-block-flip">
         <div className="landing-section-glow landing-section-glow--cool" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Categories</p>
@@ -201,7 +202,7 @@ export function Landing() {
             show up without hunting through every line.
           </p>
         </div>
-        <div className="landing-block-visual landing-block-visual-soft" data-reveal>
+        <Reveal as="div" className="landing-block-visual landing-block-visual-soft" delay={0.08}>
           <div className="landing-category-plane" aria-hidden>
             <div className="landing-category-row">
               <span className="landing-category-dot" style={{ background: "#6b8f71" }} />
@@ -224,10 +225,10 @@ export function Landing() {
               <span className="landing-category-bar" style={{ width: "51%" }} />
             </div>
           </div>
-        </div>
-      </section>
+        </Reveal>
+      </Reveal>
 
-      <section className="landing-block" data-reveal>
+      <Reveal className="landing-block">
         <div className="landing-section-glow" aria-hidden />
         <div className="landing-block-inner">
           <p className="landing-kicker">Planner</p>
@@ -237,7 +238,7 @@ export function Landing() {
             no guesswork dressed up as advice.
           </p>
         </div>
-        <div className="landing-block-visual" data-reveal>
+        <Reveal as="div" className="landing-block-visual" delay={0.08}>
           <div className="landing-plan-plane" aria-hidden>
             <p className="landing-plan-label">This month</p>
             <p className="landing-plan-title">Groceries budget</p>
@@ -246,10 +247,10 @@ export function Landing() {
             </div>
             <p className="landing-plan-meta">$310 of $500 remaining</p>
           </div>
-        </div>
-      </section>
+        </Reveal>
+      </Reveal>
 
-      <section className="landing-close" data-reveal>
+      <Reveal className="landing-close">
         <div className="landing-section-glow landing-section-glow--close" aria-hidden />
         <p className="landing-brand landing-brand-close">Woney</p>
         <h2 className="landing-close-title">Built for trust. Tuned for everyday use.</h2>
@@ -262,7 +263,7 @@ export function Landing() {
             Sign in
           </Link>
         </div>
-      </section>
+      </Reveal>
 
       <footer className="landing-footer">
         <span>© {new Date().getFullYear()} Woney</span>

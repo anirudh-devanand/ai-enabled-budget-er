@@ -1,5 +1,9 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 export function GoalRing({
   pct,
   size = 120,
@@ -9,10 +13,12 @@ export function GoalRing({
   size?: number;
   stroke?: number;
 }) {
+  const reduce = useReducedMotion();
   const clamped = Math.max(0, Math.min(100, pct));
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (clamped / 100) * c;
+
   return (
     <svg
       width={size}
@@ -29,7 +35,7 @@ export function GoalRing({
         stroke="var(--border)"
         strokeWidth={stroke}
       />
-      <circle
+      <motion.circle
         cx={size / 2}
         cy={size / 2}
         r={r}
@@ -38,8 +44,10 @@ export function GoalRing({
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeDasharray={c}
-        strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        initial={reduce ? false : { strokeDashoffset: c }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: reduce ? 0 : 0.7, ease: EASE }}
       />
       <text
         x="50%"
