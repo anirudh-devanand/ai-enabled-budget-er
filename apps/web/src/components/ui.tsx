@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AnimatedToast } from "@/components/AnimatedToast";
+import { BankReauthPrompt } from "@/components/BankReauthPrompt";
 import { CategoryIcon } from "@/components/CategoryChip";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BankReauthPrompt } from "@/components/BankReauthPrompt";
 import { api } from "@/lib/api";
 import {
   getBankSyncState,
@@ -153,7 +154,7 @@ export function AppShell({
             <Link href="/account#security">Account → Security</Link>
           </div>
         )}
-        {toast && <div className="toast app-chrome-toast">{toast}</div>}
+        <AnimatedToast message={toast} className="app-chrome-toast" />
         {children}
       </div>
       <BankReauthPrompt targets={reauthRequired} />

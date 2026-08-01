@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import type {
   AccountResponse,
   CategoryResponse,
   TransactionResponse,
 } from "@woney/api-client";
+import { AnimatedToast } from "@/components/AnimatedToast";
 import { AppShell, CategoryIcon, FilterBar } from "@/components/ui";
-import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { isUnauthorized } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
@@ -83,8 +84,11 @@ function CorrectionForm({
   );
 }
 
+const ROW_EASE = [0.22, 1, 0.36, 1] as const;
+
 export default function TransactionsPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
@@ -195,59 +199,69 @@ export default function TransactionsPage() {
         </div>
       </FilterBar>
 
-      {toast && <div className="toast">{toast}</div>}
+      <AnimatedToast message={toast} />
 
       <div className="list-card">
-        {transactions.map((t) => {
-          const pref = t.category_id ? catMap[t.category_id] : undefined;
-          return (
-            <div key={t.id} style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="txn-row" style={{ borderBottom: "none" }}>
-                <CategoryIcon name={t.category_name} pref={pref} />
-                <div className="txn-meta">
-                  <div className="name">{t.display_name}</div>
-                  <div className="sub">
-                    {t.date}
-                    {t.category_name ? ` · ${t.category_name}` : ""}
-                    {t.needs_review ? " · needs review" : ""}
-                    <button
-                      type="button"
-                      onClick={() => setEditing(editing === t.id ? null : t.id)}
-                      style={{
-                        marginLeft: 8,
-                        background: "none",
-                        border: "none",
-                        color: "var(--accent)",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        padding: 0,
-                      }}
-                    >
-                      {editing === t.id ? "Cancel" : "Edit type"}
-                    </button>
+        <AnimatePresence mode="popLayout" initial={false}>
+          {transactions.map((t) => {
+            const pref = t.category_id ? catMap[t.category_id] : undefined;
+            return (
+              <motion.div
+                key={t.id}
+                layout={!reduceMotion}
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2, ease: ROW_EASE }}
+                style={{ borderBottom: "1px solid var(--border)" }}
+              >
+                <div className="txn-row" style={{ borderBottom: "none" }}>
+                  <CategoryIcon name={t.category_name} pref={pref} />
+                  <div className="txn-meta">
+                    <div className="name">{t.display_name}</div>
+                    <div className="sub">
+                      {t.date}
+                      {t.category_name ? ` · ${t.category_name}` : ""}
+                      {t.needs_review ? " · needs review" : ""}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(editing === t.id ? null : t.id)}
+                        style={{
+                          marginLeft: 8,
+                          background: "none",
+                          border: "none",
+                          color: "var(--accent)",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        {editing === t.id ? "Cancel" : "Edit type"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
+                    {formatMoney(t.amount, t.currency)}
                   </div>
                 </div>
-                <div className={`txn-amount${Number(t.amount) >= 0 ? " in" : ""}`}>
-                  {formatMoney(t.amount, t.currency)}
-                </div>
-              </div>
-              {editing === t.id && (
-                <div style={{ padding: "0 16px 16px 74px" }}>
-                  <CorrectionForm
-                    transaction={t}
-                    categories={categories}
-                    onDone={async (message) => {
-                      setEditing(null);
-                      setToast(message);
-                      if (householdId) await load(householdId);
-                      setTimeout(() => setToast(null), 4000);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {editing === t.id && (
+                  <div style={{ padding: "0 16px 16px 74px" }}>
+                    <CorrectionForm
+                      transaction={t}
+                      categories={categories}
+                      onDone={async (message) => {
+                        setEditing(null);
+                        setToast(message);
+                        if (householdId) await load(householdId);
+                        setTimeout(() => setToast(null), 4000);
+                      }}
+                    />
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
         {transactions.length === 0 && (
           <p style={{ padding: 24 }} className="muted">
             No transactions match these filters.

@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import {
   createContext,
   useCallback,
@@ -56,7 +57,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [theme, setTheme, toggleTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

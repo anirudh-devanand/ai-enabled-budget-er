@@ -9,6 +9,7 @@ import type {
   TransactionResponse,
   UserResponse,
 } from "@woney/api-client";
+import { AnimatedBalance } from "@/components/AnimatedBalance";
 import { BankLogo } from "@/components/BankLogo";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { WoneyLoader } from "@/components/WoneyLoader";
@@ -68,9 +69,11 @@ export default function DashboardPage() {
 
       <div className="hero-balance">
         <div className="label">Total balance</div>
-        <div className="amount">
-          {formatMoney(String(netBalance), accounts[0]?.currency ?? "CAD")}
-        </div>
+        <AnimatedBalance
+          className="amount"
+          value={netBalance}
+          currency={accounts[0]?.currency ?? "CAD"}
+        />
         <div className="meta">
           {accounts.length} account{accounts.length === 1 ? "" : "s"} · CAD
         </div>

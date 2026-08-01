@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { MfaChallengeResponse } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
@@ -20,6 +21,7 @@ const OTP_LENGTH = 6;
 function MfaInner() {
   const router = useRouter();
   const params = useSearchParams();
+  const reduceMotion = useReducedMotion();
   const [challenge, setChallenge] = useState<MfaChallengeResponse | null>(null);
   const [useAuthenticator, setUseAuthenticator] = useState(false);
   const [useRecovery, setUseRecovery] = useState(false);
@@ -183,10 +185,29 @@ function MfaInner() {
                     onComplete={onOtpComplete}
                     disabled={busy}
                     autoFocus
+                    errorKey={error}
                     aria-label={showingEmail ? "Email verification code" : "Authenticator code"}
                   />
                 </div>
-                {error && <div className="error">{error}</div>}
+                <AnimatePresence>
+                  {error ? (
+                    <motion.div
+                      key={error}
+                      className="error"
+                      role="alert"
+                      initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+                      animate={
+                        reduceMotion
+                          ? { opacity: 1 }
+                          : { opacity: 1, y: 0, x: [0, -4, 4, -2, 2, 0] }
+                      }
+                      exit={reduceMotion ? undefined : { opacity: 0 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.32 }}
+                    >
+                      {error}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
                 {busy && (
                   <p className="muted" style={{ marginTop: 12 }}>
                     Verifying…

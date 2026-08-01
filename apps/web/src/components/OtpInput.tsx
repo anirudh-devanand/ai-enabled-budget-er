@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef } from "react";
 
 const DIGIT_RE = /^\d$/;
@@ -10,6 +11,8 @@ type Props = {
   onChange: (value: string) => void;
   disabled?: boolean;
   autoFocus?: boolean;
+  /** Triggers a brief shake when truthy / when the value changes. */
+  errorKey?: string | null;
   /** Called once when `value` reaches `length` digits (caller handles submit). */
   onComplete?: (value: string) => void;
   "aria-label"?: string;
@@ -27,6 +30,7 @@ export function OtpInput({
   onChange,
   disabled,
   autoFocus,
+  errorKey,
   onComplete,
   "aria-label": ariaLabel = "One-time code",
   id,
@@ -36,6 +40,19 @@ export function OtpInput({
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const completedRef = useRef<string | null>(null);
   const code = onlyDigits(value, length);
+  const reduce = useReducedMotion();
+  const shakeControls = useAnimationControls();
+  const lastError = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (errorKey && errorKey !== lastError.current && !reduce) {
+      void shakeControls.start({
+        x: [0, -5, 5, -3, 3, 0],
+        transition: { duration: 0.35 },
+      });
+    }
+    lastError.current = errorKey;
+  }, [errorKey, reduce, shakeControls]);
 
   useEffect(() => {
     if (code.length === length) {
@@ -116,11 +133,17 @@ export function OtpInput({
   }
 
   return (
-    <div className="otp-input" role="group" aria-label={ariaLabel}>
+    <motion.div
+      className="otp-input"
+      role="group"
+      aria-label={ariaLabel}
+      animate={shakeControls}
+    >
       {Array.from({ length }, (_, index) => {
         const digit = code[index] ?? "";
+        const filled = digit !== "";
         return (
-          <input
+          <motion.input
             key={index}
             ref={(el) => {
               refs.current[index] = el;
@@ -148,9 +171,16 @@ export function OtpInput({
               }
               e.target.select();
             }}
+            animate={
+              reduce
+                ? undefined
+                : { scale: filled ? 1.02 : 1 }
+            }
+            whileFocus={reduce ? undefined : { scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 420, damping: 28 }}
           />
         );
       })}
-    </div>
+    </motion.div>
   );
 }
