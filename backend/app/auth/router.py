@@ -49,6 +49,11 @@ router = APIRouter(prefix="/v1/auth", tags=["auth"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
+# Shared copy for expired MFA JWT / challenge handoff (web redirects to /login with this).
+MFA_CHALLENGE_EXPIRED_DETAIL = (
+    "Verification timed out. Sign in again to get a new code."
+)
+
 
 async def _issue_and_set_cookie(
     db: AsyncSession,
@@ -124,9 +129,14 @@ async def mfa_verify(
         await record_security_event(
             db, event_type="mfa_verify_failed", request=request, meta={"reason": "bad_challenge"}, commit=True
         )
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, MFA_CHALLENGE_EXPIRED_DETAIL)
     user = await db.get(User, user_id)
-    if user is None or not await service.verify_login_mfa(db, user, body.code):
+    if user is None:
+        await record_security_event(
+            db, event_type="mfa_verify_failed", request=request, meta={"reason": "bad_challenge"}, commit=True
+        )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, MFA_CHALLENGE_EXPIRED_DETAIL)
+    if not await service.verify_login_mfa(db, user, body.code):
         await record_security_event(
             db,
             event_type="mfa_verify_failed",
@@ -135,6 +145,12 @@ async def mfa_verify(
             meta={"reason": "bad_code"},
             commit=True,
         )
+        # Email-only challenges: expired OTP should not look like a wrong code.
+        # Authenticator users keep "Invalid code" until the JWT itself expires.
+        if not service.authenticator_enabled(user) and await service.email_login_otp_expired(
+            db, user.id
+        ):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, MFA_CHALLENGE_EXPIRED_DETAIL)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid code")
     pair = await _issue_and_set_cookie(db, response, request, user.id)
     await record_security_event(
@@ -148,10 +164,10 @@ async def mfa_resend(body: MfaResendRequest, db: DbDep, request: Request) -> Mfa
     check_rate_limit(request, bucket="auth-mfa-resend", limit=8, window_seconds=900)
     user_id = decode_token(body.challenge_token, MFA_CHALLENGE_TOKEN)
     if user_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, MFA_CHALLENGE_EXPIRED_DETAIL)
     user = await db.get(User, user_id)
     if user is None or not user.mfa_enabled:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired challenge")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, MFA_CHALLENGE_EXPIRED_DETAIL)
     return await service.issue_login_mfa_challenge(db, user)
 
 

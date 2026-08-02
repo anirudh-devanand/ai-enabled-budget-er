@@ -1,5 +1,14 @@
-import pyotp
+from datetime import UTC, datetime, timedelta
 
+import jwt
+import pyotp
+from sqlalchemy import select
+
+from app.auth.models import MfaLoginChallenge
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.core.security import MFA_CHALLENGE_TOKEN
+from app.main import app
 from tests.conftest import login_complete, register_and_login
 
 
@@ -150,6 +159,115 @@ async def test_mfa_enroll_activate_and_login_flow(client, register_payload):
         json={"challenge_token": challenge, "code": recovery[0]},
     )
     assert resp.status_code == 401
+
+
+async def test_mfa_challenge_includes_aligned_expiry(client, register_payload):
+    await client.post("/v1/auth/register", json=register_payload)
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body.get("mfa_required") is True
+    expected = max(60, get_settings().mfa_challenge_minutes * 60)
+    assert body.get("expires_in_seconds") == expected
+    assert body.get("dev_code")
+
+    # JWT exp should match the configured challenge window (± a few seconds).
+    payload = jwt.decode(
+        body["challenge_token"],
+        get_settings().jwt_secret,
+        algorithms=[get_settings().jwt_algorithm],
+        options={"require": ["exp"]},
+    )
+    assert payload["type"] == MFA_CHALLENGE_TOKEN
+    remaining = payload["exp"] - datetime.now(UTC).timestamp()
+    assert expected - 15 <= remaining <= expected + 5
+
+
+async def test_mfa_verify_rejects_expired_challenge_token(client, register_payload):
+    await client.post("/v1/auth/register", json=register_payload)
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    body = resp.json()
+    settings = get_settings()
+    expired = jwt.encode(
+        {
+            "sub": jwt.decode(
+                body["challenge_token"],
+                settings.jwt_secret,
+                algorithms=[settings.jwt_algorithm],
+            )["sub"],
+            "type": MFA_CHALLENGE_TOKEN,
+            "exp": datetime.now(UTC) - timedelta(seconds=5),
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+    resp = await client.post(
+        "/v1/auth/mfa/verify",
+        json={"challenge_token": expired, "code": body["dev_code"]},
+    )
+    assert resp.status_code == 401
+    assert "timed out" in resp.json()["detail"].lower()
+
+
+async def test_mfa_verify_rejects_expired_email_otp(client, register_payload):
+    await client.post("/v1/auth/register", json=register_payload)
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    body = resp.json()
+    assert body.get("dev_code")
+
+    # Expire the DB OTP row while keeping a still-valid JWT (email-only path).
+    override = app.dependency_overrides[get_db]
+    db_gen = override()
+    session = await db_gen.__anext__()
+    try:
+        result = await session.execute(
+            select(MfaLoginChallenge).where(MfaLoginChallenge.consumed_at.is_(None))
+        )
+        row = result.scalar_one()
+        row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        await session.commit()
+    finally:
+        await db_gen.aclose()
+
+    resp = await client.post(
+        "/v1/auth/mfa/verify",
+        json={"challenge_token": body["challenge_token"], "code": body["dev_code"]},
+    )
+    assert resp.status_code == 401
+    assert "timed out" in resp.json()["detail"].lower()
+
+
+async def test_mfa_resend_refreshes_challenge_expiry(client, register_payload):
+    await client.post("/v1/auth/register", json=register_payload)
+    resp = await client.post(
+        "/v1/auth/login",
+        json={"email": register_payload["email"], "password": register_payload["password"]},
+    )
+    first = resp.json()
+    resp = await client.post(
+        "/v1/auth/mfa/resend", json={"challenge_token": first["challenge_token"]}
+    )
+    assert resp.status_code == 200
+    second = resp.json()
+    assert second.get("expires_in_seconds") == first.get("expires_in_seconds")
+    assert second.get("dev_code")
+    assert second["dev_code"] != first["dev_code"]
+    # Fresh OTP works with the (possibly same-second) challenge JWT.
+    resp = await client.post(
+        "/v1/auth/mfa/verify",
+        json={"challenge_token": second["challenge_token"], "code": second["dev_code"]},
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
 
 
 async def test_refresh_and_logout_via_httponly_cookie(client, register_payload):

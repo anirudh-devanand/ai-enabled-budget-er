@@ -27,6 +27,8 @@ class MfaChallengeResponse(BaseModel):
     primary_method: str = "email"  # email | totp | inline
     totp_available: bool = False
     message: str = "Enter your verification code"
+    # Seconds until this challenge (JWT + email OTP) expires. Resend refreshes it.
+    expires_in_seconds: int = 300
     # Only set in non-production when email is unavailable.
     dev_code: str | None = None
 

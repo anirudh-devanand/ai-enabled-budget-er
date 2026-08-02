@@ -7,21 +7,36 @@ import type { MfaChallengeResponse } from "@woney/api-client";
 import { AuthBrand } from "@/components/AuthBrand";
 import { AuthAlert, FadeIn } from "@/components/MotionEnter";
 import { OtpInput } from "@/components/OtpInput";
+import { WoneyLoader } from "@/components/WoneyLoader";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 import {
   clearMfaChallenge,
+  isMfaChallengeExpiredError,
+  loginWithMfaTimeoutHref,
+  MFA_TIMEOUT_MESSAGE,
   resolveMfaChallenge,
+  resolveMfaExpiresAtMs,
   storeMfaChallenge,
 } from "@/lib/mfaChallenge";
 
 const OTP_LENGTH = 6;
 
+function formatRemaining(totalSeconds: number): string {
+  const s = Math.max(0, totalSeconds);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
 function MfaInner() {
   const router = useRouter();
   const params = useSearchParams();
   const [challenge, setChallenge] = useState<MfaChallengeResponse | null>(null);
+  const [expiresAtMs, setExpiresAtMs] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [useAuthenticator, setUseAuthenticator] = useState(false);
   const [useRecovery, setUseRecovery] = useState(false);
   const [code, setCode] = useState("");
@@ -30,6 +45,17 @@ function MfaInner() {
   const [ready, setReady] = useState(false);
   const submittingRef = useRef(false);
   const bootstrapped = useRef(false);
+  const timedOutRef = useRef(false);
+
+  const redirectTimedOut = useCallback(
+    (message = MFA_TIMEOUT_MESSAGE) => {
+      if (timedOutRef.current) return;
+      timedOutRef.current = true;
+      clearMfaChallenge();
+      router.replace(loginWithMfaTimeoutHref(message));
+    },
+    [router],
+  );
 
   useEffect(() => {
     // Resolve once per mount from URL (durable) and/or sessionStorage.
@@ -45,25 +71,55 @@ function MfaInner() {
       router.replace("/login");
       return;
     }
+    const expires = resolveMfaExpiresAtMs(parsed);
+    if (expires <= Date.now()) {
+      clearMfaChallenge();
+      router.replace(loginWithMfaTimeoutHref());
+      return;
+    }
     storeMfaChallenge(parsed);
     setChallenge(parsed);
+    setExpiresAtMs(expires);
     setUseAuthenticator(parsed.primary_method === "totp");
     setReady(true);
   }, [params, router]);
 
+  useEffect(() => {
+    if (expiresAtMs == null) return;
+
+    const tick = () => {
+      const leftMs = expiresAtMs - Date.now();
+      const leftSec = Math.ceil(leftMs / 1000);
+      setRemainingSeconds(Math.max(0, leftSec));
+      if (leftMs <= 0) {
+        redirectTimedOut();
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [expiresAtMs, redirectTimedOut]);
+
   function applyChallenge(result: MfaChallengeResponse) {
     storeMfaChallenge(result);
     setChallenge(result);
+    setExpiresAtMs(resolveMfaExpiresAtMs(result));
     setUseAuthenticator(result.primary_method === "totp");
     setUseRecovery(false);
     setCode("");
+    timedOutRef.current = false;
   }
 
   const verify = useCallback(
     async (rawCode: string) => {
-      if (!challenge || submittingRef.current) return;
+      if (!challenge || submittingRef.current || timedOutRef.current) return;
       const trimmed = rawCode.trim();
       if (!trimmed) return;
+      if (expiresAtMs != null && expiresAtMs <= Date.now()) {
+        redirectTimedOut();
+        return;
+      }
       submittingRef.current = true;
       setError(null);
       setBusy(true);
@@ -73,13 +129,18 @@ function MfaInner() {
         kickoffBankSync();
         router.replace("/dashboard");
       } catch (err) {
-        setError(authErrorMessage(err, "Could not verify code."));
+        const message = authErrorMessage(err, "Could not verify code.");
+        if (isMfaChallengeExpiredError(message)) {
+          redirectTimedOut(message);
+          return;
+        }
+        setError(message);
         setCode("");
         submittingRef.current = false;
         setBusy(false);
       }
     },
-    [challenge, router],
+    [challenge, expiresAtMs, redirectTimedOut, router],
   );
 
   const onOtpComplete = useCallback(
@@ -95,14 +156,23 @@ function MfaInner() {
   }
 
   async function resendEmailCode() {
-    if (!challenge) return;
+    if (!challenge || timedOutRef.current) return;
+    if (expiresAtMs != null && expiresAtMs <= Date.now()) {
+      redirectTimedOut();
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
       const next = await api.resendMfa(challenge.challenge_token);
       applyChallenge(next);
     } catch (err) {
-      setError(authErrorMessage(err, "Could not resend code."));
+      const message = authErrorMessage(err, "Could not resend code.");
+      if (isMfaChallengeExpiredError(message)) {
+        redirectTimedOut(message);
+        return;
+      }
+      setError(message);
     } finally {
       setBusy(false);
       submittingRef.current = false;
@@ -110,7 +180,7 @@ function MfaInner() {
   }
 
   if (!ready || !challenge) {
-    return <main className="auth" />;
+    return <WoneyLoader label="Preparing verification…" />;
   }
 
   const showingEmail =
@@ -195,6 +265,12 @@ function MfaInner() {
                   </p>
                 )}
               </div>
+            )}
+
+            {remainingSeconds != null && remainingSeconds > 0 && (
+              <p className="muted" style={{ marginTop: 12 }} aria-live="polite">
+                Session expires in {formatRemaining(remainingSeconds)}
+              </p>
             )}
 
             {showingEmail && (

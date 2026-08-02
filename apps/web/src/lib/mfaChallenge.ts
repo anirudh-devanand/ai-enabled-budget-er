@@ -7,6 +7,12 @@ export const MFA_QUERY_CHALLENGE = "challenge";
 export const MFA_QUERY_METHOD = "method";
 export const MFA_QUERY_TOTP = "totp";
 
+/** Matches backend `mfa_challenge_minutes` default (5). */
+export const MFA_CHALLENGE_TTL_FALLBACK_SECONDS = 300;
+
+export const MFA_TIMEOUT_MESSAGE =
+  "Verification timed out. Sign in again to get a new code.";
+
 export function storeMfaChallenge(result: MfaChallengeResponse) {
   if (typeof sessionStorage === "undefined") return;
   try {
@@ -44,6 +50,51 @@ export function mfaChallengeHref(result: MfaChallengeResponse): string {
   if (result.primary_method) q.set(MFA_QUERY_METHOD, result.primary_method);
   if (result.totp_available) q.set(MFA_QUERY_TOTP, "1");
   return `/login/mfa?${q.toString()}`;
+}
+
+export function loginWithMfaTimeoutHref(message = MFA_TIMEOUT_MESSAGE): string {
+  return `/login?error=${encodeURIComponent(message)}`;
+}
+
+/** Read JWT `exp` (ms) without verifying — UX timer only; server still validates. */
+export function mfaChallengeExpiresAtMs(challengeToken: string): number | null {
+  try {
+    const parts = challengeToken.split(".");
+    if (parts.length < 2 || !parts[1]) return null;
+    const json = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json) as { exp?: unknown };
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Absolute expiry for the MFA page timer.
+ * Prefer JWT exp (works for URL-only handoff); else expires_in_seconds from now.
+ */
+export function resolveMfaExpiresAtMs(
+  challenge: Pick<MfaChallengeResponse, "challenge_token" | "expires_in_seconds">,
+  nowMs = Date.now(),
+): number {
+  const fromJwt = mfaChallengeExpiresAtMs(challenge.challenge_token);
+  if (fromJwt != null) return fromJwt;
+  const ttl =
+    typeof challenge.expires_in_seconds === "number" && challenge.expires_in_seconds > 0
+      ? challenge.expires_in_seconds
+      : MFA_CHALLENGE_TTL_FALLBACK_SECONDS;
+  return nowMs + ttl * 1000;
+}
+
+export function isMfaChallengeExpiredError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("timed out") ||
+    lower.includes("expired challenge") ||
+    (lower.includes("expired") && lower.includes("sign in again"))
+  );
 }
 
 function methodFromParam(raw: string | null): MfaChallengeResponse["primary_method"] {

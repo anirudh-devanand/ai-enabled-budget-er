@@ -21,13 +21,20 @@ from app.core.security import (
 from app.users.models import User
 
 RECOVERY_CODE_COUNT = 10
-EMAIL_OTP_TTL_SECONDS = 600
+# Fallback if settings are unavailable; keep in sync with config.mfa_challenge_minutes.
+EMAIL_OTP_TTL_SECONDS = 300
 EMAIL_OTP_MAX_ATTEMPTS = 5
 
 
 def authenticator_enabled(user: User) -> bool:
     """True once TOTP has been activated (recovery codes issued)."""
     return bool(user.mfa_secret and user.mfa_recovery_hashes)
+
+
+def mfa_challenge_ttl_seconds() -> int:
+    """Login MFA window for JWT challenge + email OTP (aligned)."""
+    settings = get_settings()
+    return max(60, int(settings.mfa_challenge_minutes) * 60)
 
 
 def _generate_email_otp() -> str:
@@ -41,6 +48,7 @@ async def issue_login_mfa_challenge(
     from app.account.email import email_configured, send_login_mfa_code
 
     now = datetime.now(UTC)
+    ttl = mfa_challenge_ttl_seconds()
     existing = await db.execute(
         select(MfaLoginChallenge).where(
             MfaLoginChallenge.user_id == user.id,
@@ -51,11 +59,12 @@ async def issue_login_mfa_challenge(
         row.consumed_at = now
 
     plain = _generate_email_otp()
+    expires_at = now + timedelta(seconds=ttl)
     db.add(
         MfaLoginChallenge(
             user_id=user.id,
             code_hash=hash_refresh_token(plain),
-            expires_at=now + timedelta(seconds=EMAIL_OTP_TTL_SECONDS),
+            expires_at=expires_at,
         )
     )
     await db.commit()
@@ -83,19 +92,18 @@ async def issue_login_mfa_challenge(
         dev_code = plain
 
     return MfaChallengeResponse(
-        challenge_token=create_mfa_challenge_token(user.id),
+        challenge_token=create_mfa_challenge_token(user.id, expires_at=expires_at),
         primary_method=primary,
         totp_available=totp_ok,
         message=message,
+        expires_in_seconds=ttl,
         dev_code=dev_code,
     )
 
 
-async def verify_email_login_otp(db: AsyncSession, user_id: uuid.UUID, code: str) -> bool:
-    cleaned = code.strip()
-    if not cleaned.isdigit() or len(cleaned) != 6:
-        return False
-    now = datetime.now(UTC)
+async def _latest_open_email_challenge(
+    db: AsyncSession, user_id: uuid.UUID
+) -> MfaLoginChallenge | None:
     result = await db.execute(
         select(MfaLoginChallenge)
         .where(
@@ -105,13 +113,34 @@ async def verify_email_login_otp(db: AsyncSession, user_id: uuid.UUID, code: str
         .order_by(MfaLoginChallenge.created_at.desc())
         .limit(1)
     )
-    challenge = result.scalar_one_or_none()
-    if challenge is None:
-        return False
+    return result.scalar_one_or_none()
+
+
+def _challenge_expired(challenge: MfaLoginChallenge, now: datetime | None = None) -> bool:
+    now = now or datetime.now(UTC)
     expires = challenge.expires_at
     if expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
-    if expires < now:
+    return expires < now
+
+
+async def email_login_otp_expired(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """True when the open email OTP row exists and is past expires_at."""
+    challenge = await _latest_open_email_challenge(db, user_id)
+    if challenge is None:
+        return False
+    return _challenge_expired(challenge)
+
+
+async def verify_email_login_otp(db: AsyncSession, user_id: uuid.UUID, code: str) -> bool:
+    cleaned = code.strip()
+    if not cleaned.isdigit() or len(cleaned) != 6:
+        return False
+    now = datetime.now(UTC)
+    challenge = await _latest_open_email_challenge(db, user_id)
+    if challenge is None:
+        return False
+    if _challenge_expired(challenge, now):
         return False
     if challenge.attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
         return False

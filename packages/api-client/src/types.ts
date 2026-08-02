@@ -19,6 +19,8 @@ export interface MfaChallengeResponse {
   primary_method?: "email" | "totp" | "inline";
   totp_available?: boolean;
   message?: string;
+  /** Seconds until JWT + email OTP expire; refreshed on resend. */
+  expires_in_seconds?: number;
   dev_code?: string | null;
 }
 

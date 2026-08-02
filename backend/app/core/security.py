@@ -63,12 +63,20 @@ def create_access_token(user_id: uuid.UUID) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_mfa_challenge_token(user_id: uuid.UUID) -> str:
+def create_mfa_challenge_token(
+    user_id: uuid.UUID, *, expires_at: datetime | None = None
+) -> str:
+    """Short-lived MFA handoff JWT. Pass expires_at to align with email OTP TTL."""
     settings = get_settings()
+    exp = expires_at or (
+        datetime.now(UTC) + timedelta(minutes=settings.mfa_challenge_minutes)
+    )
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=UTC)
     payload = {
         "sub": str(user_id),
         "type": MFA_CHALLENGE_TOKEN,
-        "exp": datetime.now(UTC) + timedelta(minutes=settings.mfa_challenge_minutes),
+        "exp": exp,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
