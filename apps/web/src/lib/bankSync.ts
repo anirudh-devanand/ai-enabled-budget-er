@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import {
   getApiDetail,
   parseItemLoginRequired,
+  userFacingError,
   type BankReauthTarget,
 } from "@/lib/errors";
 
@@ -132,9 +133,9 @@ export async function syncMyBanks(options?: {
         promptBankReauth([reauth]);
         return empty;
       }
-      const message = getApiDetail(err) || "Bank sync failed";
+      const raw = getApiDetail(err, "");
       // MFA not enabled yet — not an error for login kickoff / soft refresh.
-      if (message === "mfa_required" || /mfa_required/i.test(message)) {
+      if (raw === "mfa_required" || /mfa_required/i.test(raw)) {
         const empty: BankSyncResult = {
           synced: 0,
           failed: 0,
@@ -145,7 +146,11 @@ export async function syncMyBanks(options?: {
         emit({ syncing: false, error: null, result: empty });
         return empty;
       }
-      emit({ syncing: false, error: message, result: null });
+      emit({
+        syncing: false,
+        error: userFacingError(err, "Could not sync banks. Please try again."),
+        result: null,
+      });
       throw err;
     } finally {
       inflight = null;

@@ -9,7 +9,7 @@ import { AuthAlert, FadeIn } from "@/components/MotionEnter";
 import { SsoButtons } from "@/components/SsoButtons";
 import { api } from "@/lib/api";
 import { kickoffBankSync } from "@/lib/bankSync";
-import { authErrorMessage } from "@/lib/errors";
+import { authErrorMessage, sanitizeUserMessage } from "@/lib/errors";
 import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 
 function LoginInner() {
@@ -40,7 +40,7 @@ function LoginInner() {
   useEffect(() => {
     const fromQuery = params.get("error")?.trim();
     if (!fromQuery) return;
-    setError(fromQuery);
+    setError(sanitizeUserMessage(fromQuery, "Something went wrong. Please try again."));
     try {
       window.history.replaceState({}, "", "/login");
     } catch {
@@ -62,7 +62,7 @@ function LoginInner() {
         router.replace("/dashboard");
       }
     } catch (err) {
-      setError(authErrorMessage(err));
+      setError(authErrorMessage(err, "Invalid email or password."));
     } finally {
       setBusy(false);
     }

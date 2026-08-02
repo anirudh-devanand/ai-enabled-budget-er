@@ -8,7 +8,7 @@ import { FadeIn } from "@/components/MotionEnter";
 import { GoalsSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
-import { isUnauthorized } from "@/lib/errors";
+import { isUnauthorized, userFacingError } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
 
 const GOAL_TYPES: { value: GoalType; label: string }[] = [
@@ -78,7 +78,7 @@ export default function GoalsPage() {
       });
       await refresh(householdId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create goal");
+      setError(userFacingError(err, "Could not create goal. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -91,7 +91,7 @@ export default function GoalsPage() {
       const plan = await api.buildPlan(goalId);
       setPlans((p) => ({ ...p, [goalId]: plan }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not build plan");
+      setError(userFacingError(err, "Could not build plan. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -107,7 +107,7 @@ export default function GoalsPage() {
       setContributeAmt((m) => ({ ...m, [goalId]: "" }));
       await refresh(householdId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Contribution failed");
+      setError(userFacingError(err, "Contribution failed. Please try again."));
     } finally {
       setBusy(false);
     }

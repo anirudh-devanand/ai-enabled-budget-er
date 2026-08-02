@@ -17,7 +17,12 @@ import { AccountSkeleton } from "@/components/Skeleton";
 import { CategoryIcon, AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
 import { promptBankReauth } from "@/lib/bankSync";
-import { getApiDetail, isUnauthorized, parseItemLoginRequired } from "@/lib/errors";
+import {
+  getApiDetail,
+  isUnauthorized,
+  parseItemLoginRequired,
+  userFacingError,
+} from "@/lib/errors";
 
 const PILL_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -118,7 +123,7 @@ export default function AccountPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setToast("Could not save profile — redeploy API if this persists");
+      else setToast("Could not save profile. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -148,7 +153,7 @@ export default function AccountPage() {
         promptBankReauth([reauth]);
         setToast(null);
       } else {
-        setToast("Sync failed");
+        setToast(userFacingError(err, "Could not sync that bank. Please try again."));
       }
     } finally {
       setSyncingId(null);
@@ -180,7 +185,7 @@ export default function AccountPage() {
       setDeleteStep("confirm");
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setDeleteError(getApiDetail(err, "Could not start deletion"));
+      else setDeleteError(userFacingError(err, "Could not start deletion. Please try again."));
     } finally {
       setDeleteBusy(false);
     }
@@ -200,8 +205,8 @@ export default function AccountPage() {
       router.replace("/login");
     } catch (err) {
       // Wrong password/code is 401 — keep the form unless the session is gone.
-      const detail = getApiDetail(err, "Could not delete account");
-      const lower = detail.toLowerCase();
+      const raw = getApiDetail(err, "");
+      const lower = raw.toLowerCase();
       if (
         isUnauthorized(err) &&
         (lower.includes("not authenticated") ||
@@ -211,7 +216,7 @@ export default function AccountPage() {
         router.replace("/login");
         return;
       }
-      setDeleteError(detail);
+      setDeleteError(userFacingError(err, "Could not delete account. Please try again."));
     } finally {
       setDeleteBusy(false);
     }
@@ -229,7 +234,7 @@ export default function AccountPage() {
       setMfaCode("");
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setMfaError(getApiDetail(err, "Could not start MFA enrollment"));
+      else setMfaError(userFacingError(err, "Could not start MFA enrollment. Please try again."));
     } finally {
       setMfaBusy(false);
     }
@@ -251,7 +256,7 @@ export default function AccountPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setMfaError(getApiDetail(err, "Invalid authenticator code"));
+      else setMfaError(userFacingError(err, "That code didn’t work. Try again."));
     } finally {
       setMfaBusy(false);
     }
@@ -269,7 +274,7 @@ export default function AccountPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setMfaError(getApiDetail(err, "Could not disable MFA"));
+      else setMfaError(userFacingError(err, "Could not disable MFA. Please try again."));
     } finally {
       setMfaBusy(false);
     }
@@ -286,7 +291,7 @@ export default function AccountPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setMfaError(getApiDetail(err, "Could not enable MFA"));
+      else setMfaError(userFacingError(err, "Could not enable MFA. Please try again."));
     } finally {
       setMfaBusy(false);
     }
@@ -302,7 +307,7 @@ export default function AccountPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setMfaError(getApiDetail(err, "Could not regenerate codes"));
+      else setMfaError(userFacingError(err, "Could not regenerate codes. Please try again."));
     } finally {
       setMfaBusy(false);
     }

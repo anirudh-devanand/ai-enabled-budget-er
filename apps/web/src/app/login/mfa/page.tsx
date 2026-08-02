@@ -336,7 +336,7 @@ function MfaInner() {
 
 export default function MfaPage() {
   return (
-    <Suspense fallback={<main className="auth" />}>
+    <Suspense fallback={<WoneyLoader label="Preparing verification…" />}>
       <MfaInner />
     </Suspense>
   );

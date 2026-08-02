@@ -108,7 +108,7 @@ export function AppShell({
       if (/mfa_required/i.test(detail)) {
         setToast("Turn on email MFA in Account before syncing banks");
       } else {
-        setToast("Could not sync banks");
+        setToast("Could not sync banks. Please try again.");
       }
     } finally {
       setTimeout(() => setToast(null), 2800);

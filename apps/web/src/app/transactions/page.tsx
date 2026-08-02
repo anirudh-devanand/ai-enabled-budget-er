@@ -45,6 +45,8 @@ function CorrectionForm({
           ? `Saved — also fixed ${result.reapplied_count} matching transaction${result.reapplied_count === 1 ? "" : "s"}`
           : "Saved",
       );
+    } catch {
+      onDone("Could not save that change. Please try again.");
     } finally {
       setBusy(false);
     }

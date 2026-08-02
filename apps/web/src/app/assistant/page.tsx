@@ -7,7 +7,7 @@ import { FadeIn } from "@/components/MotionEnter";
 import { AssistantSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
-import { getApiDetail, isUnauthorized } from "@/lib/errors";
+import { isUnauthorized, userFacingError } from "@/lib/errors";
 
 export default function AssistantPage() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function AssistantPage() {
           router.replace("/login");
           return;
         }
-        setError(getApiDetail(err, "Could not start chat"));
+        setError(userFacingError(err, "Could not start chat. Please try again."));
       } finally {
         setReady(true);
       }
@@ -65,7 +65,7 @@ export default function AssistantPage() {
         router.replace("/login");
         return;
       }
-      setError(getApiDetail(err, "Send failed"));
+      setError(userFacingError(err, "Could not send that message. Please try again."));
     } finally {
       setBusy(false);
     }

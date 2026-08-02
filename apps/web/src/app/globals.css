@@ -1384,18 +1384,40 @@ textarea:-webkit-autofill:focus {
 
 .woney-loader-mark {
   position: relative;
-  width: 104px;
-  height: 104px;
+  width: 128px;
+  height: 128px;
   display: grid;
   place-items: center;
+  touch-action: none;
+  cursor: default;
+}
+
+.woney-loader-glow {
+  position: absolute;
+  width: 72%;
+  height: 72%;
+  left: 50%;
+  top: 48%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--gold-soft) 0%,
+    color-mix(in srgb, var(--positive) 16%, transparent) 42%,
+    transparent 72%
+  );
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(2px);
 }
 
 .woney-loader-word {
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   letter-spacing: -0.03em;
   color: var(--text);
-  z-index: 1;
+  z-index: 2;
+  position: relative;
 }
 
 .woney-loader-ring {
@@ -1403,12 +1425,39 @@ textarea:-webkit-autofill:focus {
   inset: 0;
   border-radius: 50%;
   border: 1.5px solid var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.woney-loader-ring-outer {
   border-top-color: var(--gold);
+  border-right-color: transparent;
+  opacity: 0.95;
+}
+
+.woney-loader-ring-inner {
+  inset: 12px;
+  border-color: transparent;
+  border-bottom-color: var(--positive);
+  border-left-color: color-mix(in srgb, var(--positive) 45%, transparent);
+  opacity: 0.7;
 }
 
 .woney-loader-ring-static {
   border-top-color: var(--gold);
   opacity: 0.85;
+}
+
+.woney-loader-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -1px 0 0 -1px;
+  border-radius: 50%;
+  background: var(--gold);
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: 0 0 6px var(--gold-soft);
 }
 
 .woney-loader-track {
@@ -1443,6 +1492,13 @@ textarea:-webkit-autofill:focus {
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .woney-loader-glow {
+    filter: none;
+    opacity: 0.7;
+  }
 }
 
 /* --- Skeleton placeholders --- */

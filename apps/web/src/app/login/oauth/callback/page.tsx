@@ -12,22 +12,17 @@ import { kickoffBankSync } from "@/lib/bankSync";
 import { authErrorMessage } from "@/lib/errors";
 import { mfaChallengeHref, storeMfaChallenge } from "@/lib/mfaChallenge";
 
-/** Bump when changing OAuth callback behavior — confirms Vercel shipped this build. */
-const OAUTH_CALLBACK_BUILD = "2026-07-29-mfa-handoff-v2";
-
 const OAUTH_CODE_KEY = "woney.oauth_code_used";
 const OAUTH_REDIRECT_KEY = "woney.oauth_redirect_uri";
 
-function oauthProviderErrorMessage(error: string, description: string | null): string {
-  const desc = description?.trim();
-  if (desc) return desc;
+function oauthProviderErrorMessage(error: string): string {
   switch (error) {
     case "access_denied":
       return "Google sign-in was cancelled.";
     case "invalid_request":
       return "Google rejected the sign-in request. Try again.";
     default:
-      return `Google sign-in failed (${error}).`;
+      return "Google sign-in failed. Please try again.";
   }
 }
 
@@ -76,8 +71,7 @@ function OAuthCallbackInner() {
   useEffect(() => {
     const oauthError = params.get("error");
     if (oauthError) {
-      const message = oauthProviderErrorMessage(oauthError, params.get("error_description"));
-      setError(message);
+      setError(oauthProviderErrorMessage(oauthError));
       return;
     }
 
@@ -127,7 +121,7 @@ function OAuthCallbackInner() {
           /* ignore */
         }
         clearOAuthIntent();
-        setError(authErrorMessage(err, "Sign-in failed"));
+        setError(authErrorMessage(err, "Sign-in failed. Please try again."));
       }
     })();
   }, [params, router]);
@@ -158,12 +152,12 @@ function OAuthCallbackInner() {
     );
   }
 
-  return <WoneyLoader label={`Signing you in (${OAUTH_CALLBACK_BUILD})`} />;
+  return <WoneyLoader label="Signing you in…" />;
 }
 
 export default function OAuthCallbackPage() {
   return (
-    <Suspense fallback={<WoneyLoader label="Signing you in" />}>
+    <Suspense fallback={<WoneyLoader label="Signing you in…" />}>
       <OAuthCallbackInner />
     </Suspense>
   );

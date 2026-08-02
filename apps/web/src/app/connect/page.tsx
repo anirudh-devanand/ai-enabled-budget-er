@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { ApiError } from "@woney/api-client";
 import { AnimatedToast } from "@/components/AnimatedToast";
 import { Segmented } from "@/components/Segmented";
 import { ConnectCardSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
+import { userFacingError } from "@/lib/errors";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -52,17 +52,10 @@ function loadPlaidScript(): Promise<void> {
 }
 
 function formatPlaidStartError(err: unknown): string {
-  if (err instanceof ApiError) return err.detail;
   if (err instanceof Error && /plaid link script/i.test(err.message)) {
-    return err.message;
+    return "Could not load the bank connection screen. Check your connection and try again.";
   }
-  if (err instanceof Error && err.message.trim()) return err.message;
-  return (
-    "Could not start Plaid Link. Confirm the Render API service has " +
-    "WONEY_PLAID_CLIENT_ID + WONEY_PLAID_SECRET (or legacy LEDGER_PLAID_*), " +
-    "redeployed, and GET /healthz shows plaid_configured: true. " +
-    "Plaid secrets on Vercel alone do not configure the API."
-  );
+  return userFacingError(err, "Could not start bank connection. Please try again.");
 }
 
 function ConnectInner() {
@@ -139,7 +132,7 @@ function ConnectInner() {
         } catch (err) {
           submitted.current = false;
           setStatus("error");
-          setError(err instanceof ApiError ? err.detail : "Plaid connection failed");
+          setError(userFacingError(err, "Could not connect your bank. Please try again."));
         }
       },
       onExit: (err) => {
@@ -171,7 +164,7 @@ function ConnectInner() {
     } catch (err) {
       submitted.current = false;
       setStatus("error");
-      setError(err instanceof ApiError ? err.detail : "Import failed");
+      setError(userFacingError(err, "Could not import that file. Please try again."));
     }
   }
 
@@ -186,7 +179,7 @@ function ConnectInner() {
     } catch (err) {
       submitted.current = false;
       setStatus("error");
-      setError(err instanceof ApiError ? err.detail : "Demo seed failed");
+      setError(userFacingError(err, "Could not load demo data. Please try again."));
     }
   }
 
