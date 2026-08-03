@@ -15,11 +15,11 @@ const REST_Y = 46;
 
 /** Ascending ledger marks — abstract balance trend, not a real chart. */
 const MARKS = [
-  { h: 18, delay: 0 },
-  { h: 28, delay: 0.12 },
-  { h: 22, delay: 0.22 },
-  { h: 38, delay: 0.34 },
-  { h: 48, delay: 0.46 },
+  { h: 28, delay: 0 },
+  { h: 42, delay: 0.12 },
+  { h: 34, delay: 0.22 },
+  { h: 56, delay: 0.34 },
+  { h: 72, delay: 0.46 },
 ] as const;
 
 /** Full-page brand splash while auth / session bootstrap. */
@@ -101,10 +101,10 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
               <motion.span
                 className="woney-loader-glow-core"
                 animate={{
-                  scale: [1, 1.08, 1],
-                  opacity: [0.72, 1, 0.72],
+                  scale: [1, 1.12, 1],
+                  opacity: [0.5, 0.9, 0.5],
                 }}
-                transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
               />
             ) : (
               <span className="woney-loader-glow-core" />
@@ -168,19 +168,19 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
             {!reduce ? (
               <svg
                 className="woney-loader-line"
-                viewBox="0 0 120 12"
+                viewBox="0 0 180 18"
                 fill="none"
                 aria-hidden
               >
                 <motion.path
-                  d="M2 9.5 C 18 9.5, 22 3, 38 3.5 C 52 4, 56 8.5, 72 7 C 88 5.5, 94 2, 118 2.5"
+                  d="M3 14.5 C 28 14.5, 34 5, 58 5.5 C 80 6, 86 12.5, 110 10.5 C 134 8.5, 142 3, 177 3.5"
                   stroke="currentColor"
-                  strokeWidth="1.25"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   initial={{ pathLength: 0, opacity: 0 }}
                   animate={{
                     pathLength: [0, 1, 1, 0],
-                    opacity: [0, 0.75, 0.55, 0],
+                    opacity: [0, 0.8, 0.55, 0],
                   }}
                   transition={{
                     duration: 4.2,
