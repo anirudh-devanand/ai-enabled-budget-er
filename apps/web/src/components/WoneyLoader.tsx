@@ -15,11 +15,11 @@ const REST_Y = 46;
 
 /** Ascending ledger marks — abstract balance trend, not a real chart. */
 const MARKS = [
-  { h: 28, delay: 0 },
-  { h: 42, delay: 0.12 },
-  { h: 34, delay: 0.22 },
-  { h: 56, delay: 0.34 },
-  { h: 72, delay: 0.46 },
+  { h: 36, delay: 0 },
+  { h: 54, delay: 0.12 },
+  { h: 44, delay: 0.22 },
+  { h: 72, delay: 0.34 },
+  { h: 92, delay: 0.46 },
 ] as const;
 
 /** Full-page brand splash while auth / session bootstrap. */
@@ -101,10 +101,10 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
               <motion.span
                 className="woney-loader-glow-core"
                 animate={{
-                  scale: [1, 1.12, 1],
-                  opacity: [0.5, 0.9, 0.5],
+                  scale: [1, 1.2, 1],
+                  opacity: [0.42, 0.88, 0.42],
                 }}
-                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
               />
             ) : (
               <span className="woney-loader-glow-core" />
@@ -168,14 +168,14 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
             {!reduce ? (
               <svg
                 className="woney-loader-line"
-                viewBox="0 0 180 18"
+                viewBox="0 0 220 22"
                 fill="none"
                 aria-hidden
               >
                 <motion.path
-                  d="M3 14.5 C 28 14.5, 34 5, 58 5.5 C 80 6, 86 12.5, 110 10.5 C 134 8.5, 142 3, 177 3.5"
+                  d="M4 17.5 C 34 17.5, 42 6, 72 6.5 C 98 7, 106 15, 136 12.5 C 164 10, 174 4, 216 4.5"
                   stroke="currentColor"
-                  strokeWidth="1.5"
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   initial={{ pathLength: 0, opacity: 0 }}
                   animate={{
