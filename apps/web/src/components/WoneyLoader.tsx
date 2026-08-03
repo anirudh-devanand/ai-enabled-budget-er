@@ -8,10 +8,19 @@ import {
   useSpring,
 } from "motion/react";
 import { useEffect, useRef } from "react";
-import { ENTER_EASE } from "@/components/MotionEnter";
 
+const EASE = [0.22, 1, 0.36, 1] as const;
 const REST_X = 50;
-const REST_Y = 58;
+const REST_Y = 46;
+
+/** Ascending ledger marks — abstract balance trend, not a real chart. */
+const MARKS = [
+  { h: 18, delay: 0 },
+  { h: 28, delay: 0.12 },
+  { h: 22, delay: 0.22 },
+  { h: 38, delay: 0.34 },
+  { h: 48, delay: 0.46 },
+] as const;
 
 /** Full-page brand splash while auth / session bootstrap. */
 export function WoneyLoader({ label = "Loading" }: { label?: string }) {
@@ -21,12 +30,12 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
 
   const x = useMotionValue(REST_X);
   const y = useMotionValue(REST_Y);
-  const springX = useSpring(x, { stiffness: 140, damping: 28, mass: 0.7 });
-  const springY = useSpring(y, { stiffness: 140, damping: 28, mass: 0.7 });
+  const springX = useSpring(x, { stiffness: 140, damping: 26, mass: 0.7 });
+  const springY = useSpring(y, { stiffness: 140, damping: 26, mass: 0.7 });
   const glowLeft = useMotionTemplate`${springX}%`;
   const glowTop = useMotionTemplate`${springY}%`;
 
-  // Soft idle drift when the pointer is away — same language as AuthBrand, quieter amplitude.
+  // Idle drift when pointer is away — keeps the mark alive on mobile / no hover.
   useEffect(() => {
     if (reduce) return;
 
@@ -36,8 +45,8 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
     const tick = (now: number) => {
       if (!hovering.current) {
         const t = (now - start) / 1000;
-        x.set(REST_X + Math.sin(t * 0.45) * 3.5);
-        y.set(REST_Y + Math.cos(t * 0.38) * 2.5);
+        x.set(REST_X + Math.sin(t * 0.55) * 5);
+        y.set(REST_Y + Math.cos(t * 0.42) * 4);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -69,9 +78,9 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
     <div className="woney-loader" role="status" aria-live="polite" aria-label={label}>
       <motion.div
         className="woney-loader-inner"
-        initial={reduce ? false : { opacity: 0, y: 6 }}
+        initial={reduce ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: reduce ? 0 : 0.4, ease: ENTER_EASE }}
+        transition={{ duration: reduce ? 0 : 0.4, ease: EASE }}
       >
         <div
           ref={markRef}
@@ -87,42 +96,105 @@ export function WoneyLoader({ label = "Loading" }: { label?: string }) {
                 ? { left: `${REST_X}%`, top: `${REST_Y}%` }
                 : { left: glowLeft, top: glowTop }
             }
+          >
+            {!reduce ? (
+              <motion.span
+                className="woney-loader-glow-core"
+                animate={{
+                  scale: [1, 1.08, 1],
+                  opacity: [0.72, 1, 0.72],
+                }}
+                transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ) : (
+              <span className="woney-loader-glow-core" />
+            )}
+          </motion.span>
+
+          <motion.span
+            className="woney-loader-word"
             animate={
               reduce
                 ? undefined
                 : {
-                    scale: [1, 1.04, 1],
-                    opacity: [0.72, 1, 0.72],
+                    opacity: [0.88, 1, 0.88],
                   }
             }
             transition={
               reduce
                 ? undefined
-                : { duration: 5.5, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 3.2, repeat: Infinity, ease: "easeInOut" }
             }
-          />
+            whileHover={reduce ? undefined : { scale: 1.03 }}
+          >
+            Woney
+          </motion.span>
 
-          <span className="woney-loader-word">Woney</span>
-          <span className="woney-loader-rule" />
-        </div>
+          <div
+            className={
+              reduce
+                ? "woney-loader-motif woney-loader-motif-static"
+                : "woney-loader-motif"
+            }
+          >
+            <div className="woney-loader-ledger">
+              {MARKS.map((m, i) =>
+                reduce ? (
+                  <span
+                    key={i}
+                    className="woney-loader-bar"
+                    style={{ height: m.h }}
+                  />
+                ) : (
+                  <motion.span
+                    key={i}
+                    className="woney-loader-bar"
+                    style={{ height: m.h }}
+                    animate={{
+                      scaleY: [0.55, 1, 0.72, 1],
+                      opacity: [0.35, 0.85, 0.5, 0.85],
+                    }}
+                    transition={{
+                      duration: 3.6,
+                      delay: m.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+                )
+              )}
+            </div>
 
-        <div className="woney-loader-track" aria-hidden>
-          {!reduce ? (
-            <motion.span
-              className="woney-loader-progress"
-              initial={{ scaleX: 0.22, x: "-35%" }}
-              animate={{ scaleX: [0.22, 0.5, 0.28], x: ["-35%", "8%", "50%"] }}
-              transition={{
-                duration: 2.2,
-                repeat: Infinity,
-                ease: ENTER_EASE,
-              }}
-            />
-          ) : (
-            <span className="woney-loader-progress woney-loader-progress-static" />
-          )}
+            {!reduce ? (
+              <svg
+                className="woney-loader-line"
+                viewBox="0 0 120 12"
+                fill="none"
+                aria-hidden
+              >
+                <motion.path
+                  d="M2 9.5 C 18 9.5, 22 3, 38 3.5 C 52 4, 56 8.5, 72 7 C 88 5.5, 94 2, 118 2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.25"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{
+                    pathLength: [0, 1, 1, 0],
+                    opacity: [0, 0.75, 0.55, 0],
+                  }}
+                  transition={{
+                    duration: 4.2,
+                    repeat: Infinity,
+                    ease: EASE,
+                    times: [0, 0.45, 0.75, 1],
+                  }}
+                />
+              </svg>
+            ) : (
+              <span className="woney-loader-line-static" />
+            )}
+          </div>
         </div>
-        <p className="woney-loader-label">{label}</p>
       </motion.div>
     </div>
   );

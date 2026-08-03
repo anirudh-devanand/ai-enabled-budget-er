@@ -1379,93 +1379,106 @@ textarea:-webkit-autofill:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
 }
 
 .woney-loader-mark {
   position: relative;
+  width: 180px;
+  height: 148px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 14px;
-  padding: 36px 48px 20px;
   touch-action: none;
   cursor: default;
 }
 
 .woney-loader-glow {
   position: absolute;
-  width: 180px;
-  height: 180px;
+  width: 92%;
+  height: 88%;
   left: 50%;
-  top: 58%;
+  top: 48%;
   translate: -50% -50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.woney-loader-glow-core {
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--gold) 18%, transparent) 0%,
-    var(--gold-soft) 38%,
+    var(--gold-soft) 0%,
+    color-mix(in srgb, var(--positive) 14%, transparent) 40%,
     transparent 70%
   );
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(1px);
+  filter: blur(2px);
 }
 
 .woney-loader-word {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 1.85rem;
   letter-spacing: -0.03em;
   color: var(--text);
-  z-index: 1;
+  z-index: 2;
   position: relative;
+  line-height: 1;
 }
 
-.woney-loader-rule {
+.woney-loader-motif {
   position: relative;
   z-index: 1;
-  display: block;
-  width: 36px;
-  height: 1px;
-  background: color-mix(in srgb, var(--gold) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
 }
 
-.woney-loader-track {
-  position: relative;
-  width: 112px;
-  height: 1.5px;
+.woney-loader-motif-static {
+  opacity: 0.4;
+}
+
+.woney-loader-ledger {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 48px;
+}
+
+.woney-loader-bar {
+  width: 3px;
   border-radius: 999px;
-  background: var(--surface-muted);
-  overflow: hidden;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--positive) 55%, transparent),
+    var(--gold)
+  );
+  transform-origin: bottom center;
 }
 
-.woney-loader-progress {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 42%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--gold);
-  transform-origin: left center;
+.woney-loader-line {
+  width: 120px;
+  height: 12px;
+  color: var(--gold);
   opacity: 0.85;
 }
 
-.woney-loader-progress-static {
-  width: 36%;
-  left: 32%;
-  opacity: 0.5;
-}
-
-.woney-loader-label {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--muted);
+.woney-loader-line-static {
+  display: block;
+  width: 72px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--gold);
+  opacity: 0.45;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .woney-loader-glow {
+  .woney-loader-glow-core {
     filter: none;
     opacity: 0.65;
   }
