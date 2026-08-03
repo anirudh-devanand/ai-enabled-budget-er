@@ -1383,29 +1383,29 @@ textarea:-webkit-autofill:focus {
 
 .woney-loader-mark {
   position: relative;
-  width: 340px;
-  height: 300px;
+  width: 380px;
+  height: 340px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 26px;
   touch-action: none;
   cursor: default;
 }
 
 .woney-loader-glow {
   position: absolute;
-  width: 210%;
-  height: 210%;
+  width: 240%;
+  height: 240%;
   left: 50%;
-  top: 50%;
+  top: 52%;
   translate: -50% -50%;
   pointer-events: none;
   z-index: 0;
 }
 
-/* Soft warm gold halo — no olive/green wash; matches auth brand gold. */
+/* Soft gold halo only — theme tokens, no olive/green wash. */
 .woney-loader-glow-core {
   display: block;
   width: 100%;
@@ -1413,17 +1413,17 @@ textarea:-webkit-autofill:focus {
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(201, 168, 74, 0.34) 0%,
-    rgba(184, 154, 74, 0.16) 32%,
-    rgba(138, 107, 40, 0.08) 54%,
+    color-mix(in srgb, var(--gold) 40%, transparent) 0%,
+    color-mix(in srgb, var(--gold) 18%, transparent) 30%,
+    color-mix(in srgb, var(--gold-deep) 10%, transparent) 52%,
     transparent 74%
   );
-  filter: blur(30px);
+  filter: blur(34px);
 }
 
 .woney-loader-word {
   font-family: var(--font-display);
-  font-size: 2.35rem;
+  font-size: 2.55rem;
   letter-spacing: -0.03em;
   color: var(--text);
   z-index: 2;
@@ -1437,7 +1437,7 @@ textarea:-webkit-autofill:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   pointer-events: none;
 }
 
@@ -1448,31 +1448,31 @@ textarea:-webkit-autofill:focus {
 .woney-loader-ledger {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  height: 96px;
+  gap: 12px;
+  height: 112px;
 }
 
 .woney-loader-bar {
-  width: 7px;
+  width: 8px;
   border-radius: 999px;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, #8a6b28 48%, transparent),
+    color-mix(in srgb, var(--gold-deep) 50%, transparent),
     var(--gold)
   );
   transform-origin: bottom center;
 }
 
 .woney-loader-line {
-  width: 220px;
-  height: 22px;
+  width: 248px;
+  height: 24px;
   color: var(--gold);
   opacity: 0.85;
 }
 
 .woney-loader-line-static {
   display: block;
-  width: 132px;
+  width: 148px;
   height: 2px;
   border-radius: 999px;
   background: var(--gold);
@@ -1481,8 +1481,8 @@ textarea:-webkit-autofill:focus {
 
 @media (prefers-reduced-motion: reduce) {
   .woney-loader-glow-core {
-    filter: blur(18px);
-    opacity: 0.65;
+    filter: blur(20px);
+    opacity: 0.62;
   }
 }
 
