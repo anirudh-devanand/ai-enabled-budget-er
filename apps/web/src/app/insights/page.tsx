@@ -10,13 +10,14 @@ import type {
 } from "@woney/api-client";
 import { CashFlowChart } from "@/components/charts/CashFlowChart";
 import { CategoryBars } from "@/components/charts/CategoryBars";
+import { CategoryPieModal } from "@/components/charts/CategoryPieModal";
 import { chartColors } from "@/components/charts/chartTheme";
 import { FadeIn } from "@/components/MotionEnter";
 import { Segmented } from "@/components/Segmented";
 import { InsightsSkeleton } from "@/components/Skeleton";
 import { AppShell } from "@/components/ui";
 import { api } from "@/lib/api";
-import { isUnauthorized } from "@/lib/errors";
+import { isUnauthorized, userFacingError } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
 
 const RANGES = [30, 90, 365] as const;
@@ -33,6 +34,8 @@ export default function InsightsPage() {
   const [income, setIncome] = useState<NamedAmount[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pieOpen, setPieOpen] = useState(false);
   const colors = chartColors();
 
   const load = useCallback(async () => {
@@ -42,9 +45,11 @@ export default function InsightsPage() {
     if (!hid) {
       setLoading(false);
       setHasLoaded(true);
+      setLoadError(null);
       return;
     }
     setLoading(true);
+    setLoadError(null);
     try {
       const [nw, sum, flow, spend, inc] = await Promise.all([
         api.getNetWorth(hid),
@@ -58,6 +63,11 @@ export default function InsightsPage() {
       setCashFlow(flow);
       setSpending(spend);
       setIncome(inc);
+    } catch (err) {
+      setLoadError(
+        userFacingError(err, "Couldn't load insights. Please try again."),
+      );
+      throw err;
     } finally {
       setLoading(false);
       setHasLoaded(true);
@@ -67,10 +77,6 @@ export default function InsightsPage() {
   useEffect(() => {
     load().catch((err) => {
       if (isUnauthorized(err)) router.replace("/login");
-      else {
-        setLoading(false);
-        setHasLoaded(true);
-      }
     });
   }, [load, router]);
 
@@ -129,6 +135,16 @@ export default function InsightsPage() {
               </div>
             </div>
 
+            <div className="insight-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setPieOpen(true)}
+              >
+                Category breakdown
+              </button>
+            </div>
+
             <div className="tile chart-tile">
               <h2>Cash flow</h2>
               <p className="muted" style={{ marginTop: 6 }}>
@@ -164,6 +180,16 @@ export default function InsightsPage() {
           </FadeIn>
         )
       )}
+
+      <CategoryPieModal
+        open={pieOpen}
+        onClose={() => setPieOpen(false)}
+        data={spending}
+        days={days}
+        currency={summary?.currency ?? "CAD"}
+        loading={loading}
+        error={loadError}
+      />
     </AppShell>
   );
 }
