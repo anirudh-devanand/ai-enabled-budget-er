@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connections.models import Account, BankConnection, Transaction
+from app.connections.models import Account, BankConnection, Holding, Transaction
 from app.connections.provider import BankProvider, ProviderError, ProviderSnapshot
 from app.core.security import decrypt_field, decrypt_secret, encrypt_field, encrypt_secret
 from app.enrichment.service import enrich_transactions
@@ -135,7 +135,9 @@ async def _apply_snapshot(
             await db.flush()
         else:
             account.name = provider_account.name
+            account.type = provider_account.type
             account.balance = provider_account.balance
+            account.currency = provider_account.currency
 
         existing_ids = {
             row
@@ -159,8 +161,80 @@ async def _apply_snapshot(
             )
             db.add(row)
             new_transactions.append(row)
+
+        await _upsert_holdings(db, account, provider_account.holdings)
     await db.flush()
     return new_transactions
+
+
+async def _upsert_holdings(
+    db: AsyncSession,
+    account: Account,
+    holdings: list,
+) -> None:
+    existing = {
+        h.external_id: h
+        for h in (
+            await db.execute(select(Holding).where(Holding.account_id == account.id))
+        ).scalars()
+    }
+    seen: set[str] = set()
+    now = datetime.now(UTC)
+    for ph in holdings:
+        seen.add(ph.external_id)
+        row = existing.get(ph.external_id)
+        if row is None:
+            db.add(
+                Holding(
+                    account_id=account.id,
+                    external_id=ph.external_id,
+                    symbol=ph.symbol,
+                    name=ph.name,
+                    quantity=ph.quantity,
+                    price=ph.price,
+                    market_value=ph.market_value,
+                    currency=ph.currency,
+                    as_of=now,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        else:
+            row.symbol = ph.symbol
+            row.name = ph.name
+            row.quantity = ph.quantity
+            row.price = ph.price
+            row.market_value = ph.market_value
+            row.currency = ph.currency
+            row.as_of = now
+            row.updated_at = now
+    for ext_id, row in existing.items():
+        if ext_id not in seen:
+            await db.delete(row)
+
+
+async def list_holdings_for_account(
+    db: AsyncSession, account_id: uuid.UUID
+) -> list[Holding]:
+    result = await db.execute(
+        select(Holding)
+        .where(Holding.account_id == account_id)
+        .order_by(Holding.market_value.desc(), Holding.symbol)
+    )
+    return list(result.scalars().all())
+
+
+async def list_holdings_for_household(
+    db: AsyncSession, household_id: uuid.UUID
+) -> list[Holding]:
+    result = await db.execute(
+        select(Holding)
+        .join(Account, Account.id == Holding.account_id)
+        .join(BankConnection, BankConnection.id == Account.connection_id)
+        .where(BankConnection.household_id == household_id)
+        .order_by(Holding.market_value.desc(), Holding.symbol)
+    )
+    return list(result.scalars().all())
 
 
 async def get_connection_for_user(

@@ -17,8 +17,8 @@ class BankConnection(Base):
         Uuid, ForeignKey("households.id", ondelete="CASCADE"), index=True
     )
     provider: Mapped[str] = mapped_column(String(20), default="flinks")
-    # Aggregator credential reference (Flinks loginId), encrypted at rest.
-    login_id_encrypted: Mapped[str] = mapped_column(String(512))
+    # Aggregator credential reference (Flinks/Plaid/SnapTrade), encrypted at rest.
+    login_id_encrypted: Mapped[str] = mapped_column(Text)
     institution_name: Mapped[str | None] = mapped_column(String(120), default=None)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|active|error
     last_synced_at: Mapped[datetime | None] = mapped_column(
@@ -67,3 +67,27 @@ class Transaction(Base):
     currency: Mapped[str] = mapped_column(String(3), default="CAD")
     balance_after: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Holding(Base):
+    """Brokerage position (SnapTrade / investments)."""
+
+    __tablename__ = "holdings"
+    __table_args__ = (UniqueConstraint("account_id", "external_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
+    external_id: Mapped[str] = mapped_column(String(128))
+    symbol: Mapped[str] = mapped_column(String(64))
+    name: Mapped[str | None] = mapped_column(String(200), default=None)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 8), default=Decimal("0"))
+    price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), default=None)
+    market_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    currency: Mapped[str] = mapped_column(String(3), default="CAD")
+    as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )

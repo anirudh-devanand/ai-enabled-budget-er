@@ -71,6 +71,7 @@ async def healthz() -> dict:
     flags = {
         "plaid_configured": s.plaid_configured,
         "plaid_env": s.plaid_env,
+        "snaptrade_configured": s.snaptrade_configured,
         "google_oauth_configured": s.google_oauth_configured,
         "apple_oauth_configured": s.apple_oauth_configured,
         "microsoft_oauth_configured": s.microsoft_oauth_configured,

@@ -13,6 +13,7 @@ import type {
   GoalCreateInput,
   GoalResponse,
   GoalUpdateInput,
+  HoldingListResponse,
   HouseholdDetailResponse,
   HouseholdResponse,
   LoginResponse,
@@ -394,6 +395,50 @@ export class WoneyClient {
       "POST",
       "/v1/connections/plaid",
       { household_id: householdId, public_token: publicToken },
+      { auth: true },
+    );
+  }
+
+  createSnapTradePortal(
+    householdId: string,
+    opts?: { broker?: string; customRedirect?: string; reconnect?: string },
+  ) {
+    return this.request<{ portal_url: string; configured: boolean }>(
+      "POST",
+      "/v1/connections/snaptrade/portal",
+      {
+        household_id: householdId,
+        ...(opts?.broker ? { broker: opts.broker } : {}),
+        ...(opts?.customRedirect ? { custom_redirect: opts.customRedirect } : {}),
+        ...(opts?.reconnect ? { reconnect: opts.reconnect } : {}),
+      },
+      { auth: true },
+    );
+  }
+
+  completeSnapTradeConnection(householdId: string, authorizationId: string) {
+    return this.request<ConnectionResponse>(
+      "POST",
+      "/v1/connections/snaptrade/complete",
+      { household_id: householdId, authorization_id: authorizationId },
+      { auth: true },
+    );
+  }
+
+  listAccountHoldings(accountId: string) {
+    return this.request<HoldingListResponse>(
+      "GET",
+      `/v1/connections/accounts/${accountId}/holdings`,
+      undefined,
+      { auth: true },
+    );
+  }
+
+  listHoldings(householdId: string) {
+    return this.request<HoldingListResponse>(
+      "GET",
+      `/v1/connections/holdings?household_id=${householdId}`,
+      undefined,
       { auth: true },
     );
   }

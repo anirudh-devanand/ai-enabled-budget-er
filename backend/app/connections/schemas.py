@@ -106,3 +106,42 @@ class AccountUpdateRequest(BaseModel):
 
 class AccountDetailResponse(AccountResponse):
     recent_transactions: list[TransactionResponse] = []
+
+
+class SnapTradePortalRequest(BaseModel):
+    household_id: uuid.UUID
+    # Optional broker slug: wealthsimple | ibkr | interactive-brokers | raw SnapTrade slug
+    broker: str | None = Field(default=None, max_length=64)
+    # Redirect after portal (defaults to app connect page on server)
+    custom_redirect: str | None = Field(default=None, max_length=512)
+    # SnapTrade authorization id when repairing a connection
+    reconnect: str | None = Field(default=None, max_length=64)
+
+
+class SnapTradePortalResponse(BaseModel):
+    portal_url: str
+    configured: bool = True
+
+
+class SnapTradeCompleteRequest(BaseModel):
+    household_id: uuid.UUID
+    # SnapTrade authorization / connection id from portal redirect
+    authorization_id: str = Field(min_length=8, max_length=64)
+
+
+class HoldingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    symbol: str
+    name: str | None = None
+    quantity: Decimal
+    price: Decimal | None = None
+    market_value: Decimal
+    currency: str
+    as_of: datetime | None = None
+
+
+class HoldingListResponse(BaseModel):
+    items: list[HoldingResponse]

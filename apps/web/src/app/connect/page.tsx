@@ -13,7 +13,7 @@ import { userFacingError } from "@/lib/errors";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-type Tab = "plaid" | "csv" | "demo";
+type Tab = "plaid" | "brokerages" | "csv" | "demo";
 type Status = "idle" | "ready" | "syncing" | "error";
 
 declare global {
@@ -64,13 +64,20 @@ function ConnectInner() {
   const reduceMotion = useReducedMotion();
   const householdId = params.get("household");
   const reconnectId = params.get("reconnect");
-  const [tab, setTab] = useState<Tab>("plaid");
+  const snaptradeReturn = params.get("snaptrade");
+  const snaptradeConnectionId =
+    params.get("connection_id") || params.get("authorization_id");
+  const snapStatus = params.get("status");
+  const [tab, setTab] = useState<Tab>(
+    snaptradeReturn || snaptradeConnectionId ? "brokerages" : "plaid",
+  );
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [updateMode, setUpdateMode] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const submitted = useRef(false);
+  const snaptradeDone = useRef(false);
 
   const [accountName, setAccountName] = useState("Neo Everyday");
   const [accountType, setAccountType] = useState("chequing");
@@ -90,6 +97,29 @@ function ConnectInner() {
           setError(null);
           return;
         }
+        // Brokerage return from SnapTrade portal — complete connection.
+        if (
+          !snaptradeDone.current &&
+          snaptradeConnectionId &&
+          (snaptradeReturn === "return" || snapStatus === "SUCCESS" || !snapStatus)
+        ) {
+          if (snapStatus === "ERROR" || snapStatus === "ABANDONED") {
+            setTab("brokerages");
+            setStatus("error");
+            setError(
+              snapStatus === "ABANDONED"
+                ? "Brokerage connection was cancelled."
+                : "Brokerage connection failed. Please try again.",
+            );
+            return;
+          }
+          snaptradeDone.current = true;
+          setTab("brokerages");
+          setStatus("syncing");
+          await api.completeSnapTradeConnection(householdId, snaptradeConnectionId);
+          if (!cancelled) router.replace("/dashboard");
+          return;
+        }
         await loadPlaidScript();
         const { link_token, update_mode } = await api.createPlaidLinkToken(
           householdId,
@@ -103,14 +133,47 @@ function ConnectInner() {
       } catch (err) {
         if (!cancelled) {
           setStatus("error");
-          setError(formatPlaidStartError(err));
+          setError(
+            snaptradeConnectionId
+              ? userFacingError(err, "Could not finish brokerage connection. Please try again.")
+              : formatPlaidStartError(err),
+          );
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [householdId, reconnectId]);
+  }, [
+    householdId,
+    reconnectId,
+    router,
+    snapStatus,
+    snaptradeConnectionId,
+    snaptradeReturn,
+  ]);
+
+  const openBrokerage = useCallback(
+    async (broker?: string) => {
+      if (!householdId || submitted.current) return;
+      setError(null);
+      setStatus("syncing");
+      try {
+        const redirect = `${window.location.origin}/connect?household=${householdId}&snaptrade=return`;
+        const { portal_url } = await api.createSnapTradePortal(householdId, {
+          broker,
+          customRedirect: redirect,
+        });
+        window.location.assign(portal_url);
+      } catch (err) {
+        setStatus("error");
+        setError(
+          userFacingError(err, "Could not open brokerage connection. Please try again."),
+        );
+      }
+    },
+    [householdId],
+  );
 
   const openPlaid = useCallback(() => {
     if (!householdId || !linkToken || !window.Plaid || submitted.current) return;
@@ -203,11 +266,11 @@ function ConnectInner() {
     <AppShell householdId={householdId}>
       <div className="page-header">
         <div>
-          <h1>{updateMode ? "Reconnect your bank" : "Link a bank"}</h1>
+          <h1>{updateMode ? "Reconnect your bank" : "Link accounts"}</h1>
           <p>
             {updateMode
               ? "Your bank needs a fresh login (password, MFA, or security check). Complete Plaid Link to restore sync."
-              : "Connect with Plaid, or import a CSV for banks like Neo that need a manual path."}
+              : "Connect banks with Plaid, brokerages (Wealthsimple / IBKR) with SnapTrade, or import a CSV."}
           </p>
         </div>
         <div className="page-actions">
@@ -225,6 +288,7 @@ function ConnectInner() {
           onChange={setTab}
           options={[
             { value: "plaid", label: "Plaid Link" },
+            { value: "brokerages", label: "Brokerages" },
             { value: "csv", label: "CSV import" },
             { value: "demo", label: "Demo data" },
           ]}
@@ -233,7 +297,9 @@ function ConnectInner() {
         <AnimatedToast
           message={
             status === "syncing"
-              ? "Pulling accounts and transactions — this can take a minute…"
+              ? tab === "brokerages"
+                ? "Connecting brokerage and syncing holdings…"
+                : "Pulling accounts and transactions — this can take a minute…"
               : null
           }
         />
@@ -308,6 +374,85 @@ function ConnectInner() {
                 </p>
               )}
             </motion.section>
+            )
+          ) : null}
+
+          {tab === "brokerages" ? (
+            mfaEnabled === null ? (
+              <motion.div
+                key="broker-sk"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+              >
+                <ConnectCardSkeleton />
+              </motion.div>
+            ) : (
+              <motion.section
+                key="brokerages"
+                className="card connect-card"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, ease: EASE }}
+              >
+                <h2>Wealthsimple &amp; Interactive Brokers</h2>
+                <p className="sub">
+                  Brokerage holdings sync through SnapTrade (separate from Plaid banks). Read-only —
+                  Woney never places trades. Two-factor authentication is required.
+                </p>
+                {mfaEnabled === false ? (
+                  <div>
+                    <p className="error" style={{ marginTop: 0 }}>
+                      Enable multi-factor authentication before linking a brokerage.
+                    </p>
+                    <Link href="/account#security" className="btn btn-primary">
+                      Open Account security
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="stack" style={{ gap: 12 }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={status === "syncing"}
+                      onClick={() => openBrokerage("wealthsimple")}
+                    >
+                      Connect Wealthsimple
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={status === "syncing"}
+                      onClick={() => openBrokerage("ibkr")}
+                    >
+                      Connect Interactive Brokers
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={status === "syncing"}
+                      onClick={() => openBrokerage()}
+                    >
+                      Choose another brokerage
+                    </button>
+                    <p className="muted" style={{ marginTop: 4, fontSize: "0.88rem" }}>
+                      <strong>IBKR:</strong> In Client Portal go to Settings → Account Settings →
+                      Configure Third-Party Services, create a Flex Query, then paste the Query ID
+                      and token when SnapTrade asks.{" "}
+                      <a
+                        href="https://snaptrade.com/brokerage-integrations/ibkr-api"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        IBKR setup help
+                      </a>
+                      .
+                    </p>
+                  </div>
+                )}
+              </motion.section>
             )
           ) : null}
 

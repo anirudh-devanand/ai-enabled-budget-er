@@ -113,6 +113,22 @@ export interface AccountDetailResponse extends AccountResponse {
   recent_transactions: TransactionResponse[];
 }
 
+export interface HoldingResponse {
+  id: string;
+  account_id: string;
+  symbol: string;
+  name: string | null;
+  quantity: string;
+  price: string | null;
+  market_value: string;
+  currency: string;
+  as_of: string | null;
+}
+
+export interface HoldingListResponse {
+  items: HoldingResponse[];
+}
+
 export interface TransactionResponse {
   id: string;
   account_id: string;

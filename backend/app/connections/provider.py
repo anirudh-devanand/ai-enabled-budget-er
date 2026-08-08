@@ -30,6 +30,17 @@ class ProviderTransaction:
 
 
 @dataclass
+class ProviderHolding:
+    external_id: str
+    symbol: str
+    name: str | None
+    quantity: Decimal
+    price: Decimal | None
+    market_value: Decimal
+    currency: str
+
+
+@dataclass
 class ProviderAccount:
     external_id: str
     name: str
@@ -38,6 +49,7 @@ class ProviderAccount:
     balance: Decimal
     masked_number: str | None = None
     transactions: list[ProviderTransaction] = field(default_factory=list)
+    holdings: list[ProviderHolding] = field(default_factory=list)
 
 
 @dataclass

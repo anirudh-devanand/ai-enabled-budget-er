@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     plaid_country_codes: str = "CA"
     plaid_days_of_transactions: int = 365
 
+    # SnapTrade (brokerages: Wealthsimple, IBKR, …). Commercial API key.
+    snaptrade_client_id: str | None = None
+    snaptrade_consumer_key: str | None = None
+
     # Optional LLM (Anthropic). When unset, enrichment/assistant skip LLM stages.
     llm_api_key: str | None = None
     llm_provider: str = "anthropic"
@@ -112,6 +116,8 @@ class Settings(BaseSettings):
     @field_validator(
         "plaid_client_id",
         "plaid_secret",
+        "snaptrade_client_id",
+        "snaptrade_consumer_key",
         "google_oauth_client_id",
         "google_oauth_client_secret",
         "apple_oauth_client_id",
@@ -166,6 +172,10 @@ class Settings(BaseSettings):
     @property
     def plaid_configured(self) -> bool:
         return bool(self.plaid_client_id and self.plaid_secret)
+
+    @property
+    def snaptrade_configured(self) -> bool:
+        return bool(self.snaptrade_client_id and self.snaptrade_consumer_key)
 
     @property
     def llm_privacy_strict(self) -> bool:

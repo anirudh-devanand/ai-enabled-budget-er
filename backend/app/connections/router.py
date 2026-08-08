@@ -14,6 +14,8 @@ from app.connections.flinks import FlinksProvider
 from app.connections.models import BankConnection
 from app.connections.plaid import PlaidProvider
 from app.connections.provider import BankProvider, ProviderError, ProviderSnapshot
+from app.connections import snaptrade as snaptrade_mod
+from app.connections.snaptrade import SnapTradeProvider
 from app.connections.schemas import (
     AccountDetailResponse,
     AccountResponse,
@@ -21,9 +23,14 @@ from app.connections.schemas import (
     ConnectionCreateRequest,
     ConnectionResponse,
     CsvImportResponse,
+    HoldingListResponse,
+    HoldingResponse,
     PlaidExchangeRequest,
     PlaidLinkTokenRequest,
     PlaidLinkTokenResponse,
+    SnapTradeCompleteRequest,
+    SnapTradePortalRequest,
+    SnapTradePortalResponse,
     SyncMineResponse,
     TransactionListResponse,
     TransactionResponse,
@@ -45,6 +52,7 @@ class CompositeBankProvider:
         self._flinks = FlinksProvider()
         self._demo = DemoSeedProvider()
         self._plaid = PlaidProvider()
+        self._snaptrade = SnapTradeProvider()
 
     async def fetch_snapshot(self, login_id: str) -> ProviderSnapshot:
         if login_id.startswith("demo-seed:"):
@@ -52,6 +60,8 @@ class CompositeBankProvider:
         if login_id.startswith("access-") or login_id.startswith("plaid:"):
             token = login_id.removeprefix("plaid:")
             return await self._plaid.fetch_snapshot(token)
+        if login_id.startswith("snaptrade:"):
+            return await self._snaptrade.fetch_snapshot(login_id)
         if login_id.startswith("csv:"):
             raise ProviderError("CSV imports cannot be re-synced from the aggregator")
         return await self._flinks.fetch_snapshot(login_id)
@@ -242,6 +252,169 @@ async def create_plaid_connection(
         commit=True,
     )
     return connection
+
+
+@router.post("/snaptrade/portal", response_model=SnapTradePortalResponse)
+async def create_snaptrade_portal(
+    body: SnapTradePortalRequest, user: CurrentUser, db: DbDep, request: Request
+):
+    await _require_mfa_enabled(user, db, request)
+    await _require_membership(db, user, body.household_id)
+    await _require_owner(db, user, body.household_id)
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    if not settings.snaptrade_configured:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Brokerage linking is not configured yet",
+        )
+    try:
+        st_user_id, st_secret = await snaptrade_mod.ensure_snaptrade_user(db, user)
+        redirect = body.custom_redirect
+        if not redirect:
+            redirect = (
+                f"{settings.resolved_public_app_url()}/connect"
+                f"?household={body.household_id}&snaptrade=return"
+            )
+        portal_url = await snaptrade_mod.create_portal_url(
+            user_id=st_user_id,
+            user_secret=st_secret,
+            custom_redirect=redirect,
+            broker=body.broker,
+            reconnect=body.reconnect,
+        )
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    await record_security_event(
+        db,
+        event_type="snaptrade_portal",
+        user_id=user.id,
+        request=request,
+        meta={
+            "household_id": str(body.household_id),
+            "broker": body.broker,
+            "reconnect": body.reconnect,
+        },
+        commit=True,
+    )
+    return SnapTradePortalResponse(portal_url=portal_url, configured=True)
+
+
+@router.post(
+    "/snaptrade/complete",
+    response_model=ConnectionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def complete_snaptrade_connection(
+    body: SnapTradeCompleteRequest,
+    user: CurrentUser,
+    db: DbDep,
+    provider: ProviderDep,
+    request: Request,
+):
+    await _require_mfa_enabled(user, db, request)
+    await _require_membership(db, user, body.household_id)
+    await _require_owner(db, user, body.household_id)
+    from app.core.config import get_settings
+
+    if not get_settings().snaptrade_configured:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Brokerage linking is not configured yet",
+        )
+    try:
+        st_user_id, st_secret = await snaptrade_mod.ensure_snaptrade_user(db, user)
+        auths = await snaptrade_mod.list_authorizations(
+            user_id=st_user_id, user_secret=st_secret
+        )
+    except ProviderError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+
+    auth = next((a for a in auths if str(a.get("id")) == body.authorization_id), None)
+    if auth is None:
+        # Still allow complete if portal returned an id we haven't listed yet.
+        auth = {"id": body.authorization_id}
+
+    # Avoid duplicate connections for same authorization in this household.
+    existing = await service.list_connections(db, body.household_id)
+    for conn in existing:
+        if conn.provider != "snaptrade":
+            continue
+        from app.core.security import decrypt_secret
+
+        try:
+            plain = decrypt_secret(conn.login_id_encrypted)
+            auth_id, _, _ = snaptrade_mod.parse_login_id(plain)
+        except Exception:  # noqa: BLE001
+            continue
+        if auth_id == body.authorization_id:
+            try:
+                conn = await service.sync_connection(db, conn, provider)
+            except ProviderError as exc:
+                raise HTTPException(
+                    status.HTTP_502_BAD_GATEWAY, f"Brokerage sync failed: {exc}"
+                ) from exc
+            return conn
+
+    institution = None
+    brokerage = auth.get("brokerage") if isinstance(auth, dict) else None
+    if isinstance(brokerage, dict):
+        institution = brokerage.get("name") or brokerage.get("slug")
+    login_id = snaptrade_mod.encode_login_id(
+        body.authorization_id, st_user_id, st_secret
+    )
+    connection = await service.create_connection(
+        db,
+        body.household_id,
+        login_id,
+        provider="snaptrade",
+        institution_name=institution,
+    )
+    try:
+        connection = await service.sync_connection(db, connection, provider)
+    except ProviderError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"Brokerage sync failed: {exc}"
+        ) from exc
+    await record_security_event(
+        db,
+        event_type="snaptrade_connection_created",
+        user_id=user.id,
+        request=request,
+        meta={
+            "connection_id": str(connection.id),
+            "authorization_id": body.authorization_id,
+        },
+        commit=True,
+    )
+    return connection
+
+
+@router.get("/accounts/{account_id}/holdings", response_model=HoldingListResponse)
+async def list_account_holdings(
+    account_id: uuid.UUID, user: CurrentUser, db: DbDep
+):
+    account = await service.get_account_for_user(db, account_id, user.id)
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    rows = await service.list_holdings_for_account(db, account.id)
+    return HoldingListResponse(
+        items=[HoldingResponse.model_validate(r) for r in rows]
+    )
+
+
+@router.get("/holdings", response_model=HoldingListResponse)
+async def list_household_holdings(
+    user: CurrentUser,
+    db: DbDep,
+    household_id: Annotated[uuid.UUID, Query()],
+):
+    await _require_membership(db, user, household_id)
+    rows = await service.list_holdings_for_household(db, household_id)
+    return HoldingListResponse(
+        items=[HoldingResponse.model_validate(r) for r in rows]
+    )
 
 
 @router.post("/import", response_model=CsvImportResponse, status_code=status.HTTP_201_CREATED)

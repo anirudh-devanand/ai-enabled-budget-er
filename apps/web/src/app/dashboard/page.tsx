@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   AccountResponse,
   GoalResponse,
+  HoldingResponse,
   HouseholdResponse,
   TransactionResponse,
   UserResponse,
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [household, setHousehold] = useState<HouseholdResponse | null>(null);
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+  const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [goals, setGoals] = useState<GoalResponse[]>([]);
 
@@ -32,14 +34,16 @@ export default function DashboardPage() {
     const first = households[0] ?? null;
     setHousehold(first);
     if (first) {
-      const [accs, txns, gs] = await Promise.all([
+      const [accs, txns, gs, holds] = await Promise.all([
         api.listAccounts(first.id),
         api.listTransactions(first.id, 12),
         api.listGoals(first.id).catch(() => [] as GoalResponse[]),
+        api.listHoldings(first.id).catch(() => ({ items: [] as HoldingResponse[] })),
       ]);
       setAccounts(accs);
       setTransactions(txns.items);
       setGoals(gs.filter((g) => g.status === "active").slice(0, 2));
+      setHoldings(holds.items.slice(0, 12));
     }
   }, []);
 
@@ -156,6 +160,28 @@ export default function DashboardPage() {
           </StaggerItem>
         )}
       </Stagger>
+
+      {holdings.length > 0 && (
+        <FadeIn delay={0.08}>
+          <div className="section-title">Holdings</div>
+          <div className="list-card">
+            {holdings.map((h) => (
+              <div className="txn-row" key={h.id}>
+                <div className="txn-meta">
+                  <div className="name">{h.symbol}</div>
+                  <div className="sub">
+                    {h.name || "Position"}
+                    {Number(h.quantity) ? ` · ${Number(h.quantity).toLocaleString()} sh` : ""}
+                  </div>
+                </div>
+                <div className="txn-amount">
+                  {formatMoney(h.market_value, h.currency)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
+      )}
 
       {transactions.length > 0 && (
         <FadeIn delay={0.1}>

@@ -25,4 +25,7 @@ class User(Base):
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     # JSON list of sha256 hex hashes for one-time MFA recovery codes.
     mfa_recovery_hashes: Mapped[str | None] = mapped_column(Text, default=None)
+    # SnapTrade Commercial: stable partner user id + encrypted userSecret.
+    snaptrade_user_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    snaptrade_user_secret_encrypted: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -3,12 +3,17 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { AccountDetailResponse, AccountResponse, TransactionResponse } from "@woney/api-client";
+import type {
+  AccountDetailResponse,
+  AccountResponse,
+  HoldingResponse,
+  TransactionResponse,
+} from "@woney/api-client";
 import { FadeIn } from "@/components/MotionEnter";
 import { AccountDetailSkeleton } from "@/components/Skeleton";
 import { AppShell, CategoryIcon } from "@/components/ui";
 import { api } from "@/lib/api";
-import { isUnauthorized } from "@/lib/errors";
+import { isUnauthorized, userFacingError } from "@/lib/errors";
 import { formatMoney } from "@/lib/ui";
 
 export default function AccountDetailPage() {
@@ -17,6 +22,7 @@ export default function AccountDetailPage() {
   const accountId = String(params.id);
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [account, setAccount] = useState<AccountDetailResponse | null>(null);
+  const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
   const [nickname, setNickname] = useState("");
   const [notes, setNotes] = useState("");
   const [toast, setToast] = useState<string | null>(null);
@@ -36,6 +42,12 @@ export default function AccountDetailPage() {
       setNotes(detail.notes || "");
       setCanEdit(true);
       setError(null);
+      if (detail.type === "investment") {
+        const holds = await api.listAccountHoldings(accountId).catch(() => ({ items: [] }));
+        setHoldings(holds.items);
+      } else {
+        setHoldings([]);
+      }
     } catch {
       // Fallback when detail endpoint isn't deployed yet.
       const [accs, txns] = await Promise.all([
@@ -59,6 +71,7 @@ export default function AccountDetailPage() {
       setNotes(match.notes || "");
       setCanEdit(false);
       setError(null);
+      setHoldings([]);
     }
   }, [accountId]);
 
@@ -84,7 +97,7 @@ export default function AccountDetailPage() {
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
       if (isUnauthorized(err)) router.replace("/login");
-      else setToast("Could not save — API may need redeploy");
+      else setToast(userFacingError(err, "Could not save changes. Please try again."));
     }
   }
 
@@ -158,6 +171,27 @@ export default function AccountDetailPage() {
             Save
           </button>
         </div>
+
+        {holdings.length > 0 && (
+          <>
+            <div className="section-title">Holdings</div>
+            <div className="list-card" style={{ marginBottom: 24 }}>
+              {holdings.map((h) => (
+                <div className="txn-row" key={h.id}>
+                  <div className="txn-meta">
+                    <div className="name">{h.symbol}</div>
+                    <div className="sub">
+                      {h.name || "Position"}
+                      {Number(h.quantity) ? ` · ${Number(h.quantity).toLocaleString()} sh` : ""}
+                      {h.price != null ? ` · ${formatMoney(h.price, h.currency)}` : ""}
+                    </div>
+                  </div>
+                  <div className="txn-amount">{formatMoney(h.market_value, h.currency)}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="section-title">Recent activity</div>
         <div className="list-card">
